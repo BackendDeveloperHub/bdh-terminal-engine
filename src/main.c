@@ -1,4 +1,4 @@
-// src/main.c
+/*// src/main.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -85,3 +85,85 @@ int main(int argc, char *argv[]) {
     close(master_fd);
     return EXIT_SUCCESS;
 }
+
+*/
+
+// src/main.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "engine/screen.h"
+
+// Virtual Screen-ல் ஒரு விண்டோ பார்டர் மற்றும் டெக்ஸ்ட் எழுதும் டெஸ்ட் பங்க்ஷன்
+void draw_test_window(VirtualScreen *scr) {
+    // 1. Top Bar (Browser style Tab) எழுதுதல்
+    const char *top_bar = " [ 1: Bash ] [ 2: nvim main.c * ] [ + New ] ";
+    for (int i = 0; i < strlen(top_bar) && i < scr->cols; i++) {
+        screen_put_char(scr, 0, i, top_bar[i]);
+    }
+
+    // 2. விண்டோ பார்டர்களுக்கான எல்லைகள் (Row 2 முதல் Row 10 வரை, Col 5 முதல் Col 50 வரை)
+    int start_row = 2, end_row = 10;
+    int start_col = 5, end_col = 50;
+
+    // மூலைகள் (Corners)
+    screen_put_char(scr, start_row, start_col, '+');
+    screen_put_char(scr, start_row, end_col, '+');
+    screen_put_char(scr, end_row, start_col, '+');
+    screen_put_char(scr, end_row, end_col, '+');
+
+    // மேல் மற்றும் கீழ் கோடுகள் (Horizontal lines)
+    for (int c = start_col + 1; c < end_col; c++) {
+        screen_put_char(scr, start_row, c, '-');
+        screen_put_char(scr, end_row, c, '-');
+    }
+
+    // இடது மற்றும் வலது கோடுகள் (Vertical lines)
+    for (int r = start_row + 1; r < end_row; r++) {
+        screen_put_char(scr, r, start_col, '|');
+        screen_put_char(scr, r, end_col, '|');
+    }
+
+    // 3. விண்டோ உள்ளே ஒரு செய்தி (Window Title & Text)
+    const char *title = " BDH TERMINAL - FLOATING WINDOW ";
+    for (int i = 0; i < strlen(title); i++) {
+        screen_put_char(scr, start_row + 2, start_col + 4 + i, title[i]);
+    }
+
+    const char *msg = "Powered by தமிழி (Tamizhi)";
+    for (int i = 0; i < strlen(msg); i++) {
+        screen_put_char(scr, start_row + 4, start_col + 8 + i, msg[i]);
+    }
+}
+
+// 2D Buffer-ல் உள்ளதை அப்படியே மானிட்டரில் பிரிண்ட் செய்ய
+void render_screen_to_console(VirtualScreen *scr) {
+    printf("\033[2J\033[H"); // பழைய திரையை Clear செய்து Cursor-ஐ ஆரம்பத்திற்கு கொண்டுவர
+
+    for (int r = 0; r < scr->rows; r++) {
+        for (int c = 0; c < scr->cols; c++) {
+            putchar(scr->grid[r][c].ch);
+        }
+        putchar('\n');
+    }
+}
+
+int main() {
+    printf("BDH Terminal Engine Phase 2 - Buffer Test...\n");
+
+    // 15 வரிகள், 65 காலம்கள் கொண்ட Virtual Screen உருவாக்க
+    VirtualScreen *scr = screen_create(15, 65);
+
+    // பார்டர் மற்றும் டெக்ஸ்ட் வரைய
+    draw_test_window(scr);
+
+    // மானிட்டரில் ரெண்டர் செய்ய
+    render_screen_to_console(scr);
+
+    // மெமரியை விடுவிக்க
+    screen_destroy(scr);
+
+    return 0;
+}
+
+
