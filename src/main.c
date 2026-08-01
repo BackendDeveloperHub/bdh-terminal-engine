@@ -9,7 +9,8 @@
 #include "engine/screen.h"
 #include "ui/panes.h"
 #include "engine/parser.h"
-#include "engine/clipboard.h" // <-- 1. Clipboard Header இணைக்கப்பட்டுள்ளது!
+#include "engine/clipboard.h"
+#include "engine/cursor.h" // <-- Cursor Header இணைக்கப்பட்டுள்ளது!
 
 #define MAX_SESSIONS 2
 
@@ -35,19 +36,27 @@ void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
+// கர்சரை மறைத்து, வரைந்து முடித்தபின் Active விண்டோவில் கொண்டு வந்து நிறுத்தும் பங்க்ஷன்
 void render_all_sessions(VirtualScreen *scr, TerminalSession sessions[], int count) {
+    cursor_hide(); // 1. ரெண்டர் செய்யும்போது கர்சரை மறைக்கிறோம்
     screen_clear(scr);
+
+    // 1. Z-Index 0 (பின்னால் இருக்கும் விண்டோ)
     for (int i = 0; i < count; i++) {
         if (sessions[i].win->z_index == 0) {
             window_draw(scr, sessions[i].win);
         }
     }
+    // 2. Z-Index 1 (Active விண்டோ - முன்னால் மிதப்பது)
+    FloatingWindow *active_win = NULL;
     for (int i = 0; i < count; i++) {
         if (sessions[i].win->z_index == 1) {
             window_draw(scr, sessions[i].win);
+            active_win = sessions[i].win;
         }
     }
 
+    // 3. திரையில் பிரிண்ட் செய்தல்
     printf("\033[2J\033[H");
     for (int r = 0; r < scr->rows; r++) {
         for (int c = 0; c < scr->cols; c++) {
@@ -55,6 +64,13 @@ void render_all_sessions(VirtualScreen *scr, TerminalSession sessions[], int cou
         }
         putchar('\r');
         putchar('\n');
+    }
+
+    // 4. Active விண்டோவின் உள்ளே கர்சரை கொண்டு வந்து நிறுத்துதல்!
+    if (active_win) {
+        cursor_sync_to_window(active_win); // 2. பிளிங்க் ஆகும் கர்சரை ஒத்திசைக்கிறோம்
+    } else {
+        cursor_show();
     }
     fflush(stdout);
 }
@@ -67,7 +83,7 @@ int main() {
     TerminalSession sessions[MAX_SESSIONS];
     int active_idx = 0;
 
-    // --- 2. Engine Clipboard உருவாக்குதல் & Default Command Copy செய்தல் ---
+    // --- Engine Clipboard உருவாக்குதல் & Default Command Copy செய்தல் ---
     Clipboard *engine_cb = clipboard_create();
     const char *default_cmd = "echo BDH Clipboard Success!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
@@ -129,14 +145,14 @@ int main() {
 
                     render_all_sessions(scr, sessions, MAX_SESSIONS);
                 }
-                // Ctrl + P (ASCII 16) = Paste from Clipboard! <-- 3. PASTE HOTKEY
+                // Ctrl + P (ASCII 16) = Paste from Clipboard!
                 else if (buffer[0] == 16) {
                     const char *paste_data = clipboard_get(engine_cb);
                     if (strlen(paste_data) > 0) {
                         write(sessions[active_idx].master_fd, paste_data, strlen(paste_data));
                     }
                 }
-                // Ctrl + Y (ASCII 25) = Yank/Copy a new command! <-- 4. COPY HOTKEY
+                // Ctrl + Y (ASCII 25) = Yank/Copy a new command!
                 else if (buffer[0] == 25) {
                     const char *new_cmd = "ls -la /home\n";
                     clipboard_set(engine_cb, new_cmd, strlen(new_cmd));
@@ -173,7 +189,7 @@ int main() {
         window_destroy(sessions[i].win);
         close(sessions[i].master_fd);
     }
-    clipboard_destroy(engine_cb); // <-- 5. Clipboard Memory Cleanup
+    clipboard_destroy(engine_cb);
     screen_destroy(scr);
     printf("\r\nBDH Terminal Engine Exited Cleanly.\n\r");
     return EXIT_SUCCESS;
