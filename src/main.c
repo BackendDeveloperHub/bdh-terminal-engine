@@ -93,6 +93,7 @@ int main(int argc, char *argv[]) {
 #include <stdlib.h>
 #include <string.h>
 #include "engine/screen.h"
+#include "ui/panes.h"
 
 // Virtual Screen-ல் ஒரு விண்டோ பார்டர் மற்றும் டெக்ஸ்ட் எழுதும் டெஸ்ட் பங்க்ஷன்
 void draw_test_window(VirtualScreen *scr) {
@@ -137,7 +138,7 @@ void draw_test_window(VirtualScreen *scr) {
 }
 
 // 2D Buffer-ல் உள்ளதை அப்படியே மானிட்டரில் பிரிண்ட் செய்ய
-void render_screen_to_console(VirtualScreen *scr) {
+/*void render_screen_to_console(VirtualScreen *scr) {
     printf("\033[2J\033[H"); // பழைய திரையை Clear செய்து Cursor-ஐ ஆரம்பத்திற்கு கொண்டுவர
 
     for (int r = 0; r < scr->rows; r++) {
@@ -146,9 +147,19 @@ void render_screen_to_console(VirtualScreen *scr) {
         }
         putchar('\n');
     }
+}*/
+void render_screen_to_console(VirtualScreen *scr) {
+    printf("\033[2J\033[H");
+    for (int r = 0; r < scr->rows; r++) {
+        for (int c = 0; c < scr->cols; c++) {
+            putchar(scr->grid[r][c].ch);
+        }
+        putchar('\n');
+    }
 }
 
-int main() {
+
+/*int main() {
     printf("BDH Terminal Engine Phase 2 - Buffer Test...\n");
 
     // 15 வரிகள், 65 காலம்கள் கொண்ட Virtual Screen உருவாக்க
@@ -164,6 +175,30 @@ int main() {
     screen_destroy(scr);
 
     return 0;
+}// src/main.c
+#include <stdio.h>
+#include "engine/screen.h"
+#include "ui/panes.h"
+*/
+
+int main() {
+    VirtualScreen *scr = screen_create(20, 70);
+
+    // 1. பின்னால் இருக்கும் பெரிய விண்டோ (Z-Index: 0)
+    FloatingWindow *win1 = window_create(1, 2, 5, 50, 12, "[ 1: Bash - Background ]", 0);
+    window_draw(scr, win1);
+
+    // 2. முன்னால் மிதக்கும் சிறிய விண்டோ (Z-Index: 1) - இது win1-ன் மேல் மிதக்கும்!
+    FloatingWindow *win2 = window_create(2, 6, 20, 40, 8, "[ 2: nvim - Active Overlay ]", 1);
+    window_draw(scr, win2);
+
+    render_screen_to_console(scr);
+
+    window_destroy(win1);
+    window_destroy(win2);
+    screen_destroy(scr);
+    return 0;
 }
+
 
 
