@@ -37,6 +37,7 @@ void enable_raw_mode() {
 
 // Z-Index அடிப்படையில் பின்னால் இருப்பதை முதலில் வரைந்து, முன்னால் இருப்பதை மேலே வரைதல்
 void render_all_sessions(VirtualScreen *scr, TerminalSession sessions[], int count) {
+    screen_clear(scr);
     // 1. முதலில் Z-Index 0 (பின்னால் இருக்கும் விண்டோ) வரையலாம்
     for (int i = 0; i < count; i++) {
         if (sessions[i].win->z_index == 0) {
