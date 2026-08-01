@@ -9,10 +9,10 @@
 #include "engine/screen.h"
 #include "ui/panes.h"
 #include "engine/parser.h"
+#include "engine/clipboard.h" // <-- 1. Clipboard Header இணைக்கப்பட்டுள்ளது!
 
 #define MAX_SESSIONS 2
 
-// ஒவ்வொரு விண்டோவுக்கும் தனித்தனி PTY, Window மற்றும் Parser அமைப்பு
 typedef struct {
     int id;
     int master_fd;
@@ -35,23 +35,19 @@ void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
-// Z-Index அடிப்படையில் பின்னால் இருப்பதை முதலில் வரைந்து, முன்னால் இருப்பதை மேலே வரைதல்
 void render_all_sessions(VirtualScreen *scr, TerminalSession sessions[], int count) {
     screen_clear(scr);
-    // 1. முதலில் Z-Index 0 (பின்னால் இருக்கும் விண்டோ) வரையலாம்
     for (int i = 0; i < count; i++) {
         if (sessions[i].win->z_index == 0) {
             window_draw(scr, sessions[i].win);
         }
     }
-    // 2. அடுத்து Z-Index 1 (Active விண்டோ - முன்னால் மிதப்பது) வரையலாம்
     for (int i = 0; i < count; i++) {
         if (sessions[i].win->z_index == 1) {
             window_draw(scr, sessions[i].win);
         }
     }
 
-    // 3. திரையில் ரெண்டர் செய்தல்
     printf("\033[2J\033[H");
     for (int r = 0; r < scr->rows; r++) {
         for (int c = 0; c < scr->cols; c++) {
@@ -69,15 +65,20 @@ int main() {
 
     VirtualScreen *scr = screen_create(24, 80);
     TerminalSession sessions[MAX_SESSIONS];
-    int active_idx = 0; // ஆரம்பத்தில் 1வது விண்டோ Active
+    int active_idx = 0;
 
-    // --- Session 0 (Primary Window) உருவாக்குதல் ---
+    // --- 2. Engine Clipboard உருவாக்குதல் & Default Command Copy செய்தல் ---
+    Clipboard *engine_cb = clipboard_create();
+    const char *default_cmd = "echo BDH Clipboard Success!\n";
+    clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
+
+    // --- Session 0 (Primary Window) ---
     sessions[0].id = 0;
     sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd);
     sessions[0].win = window_create(1, 1, 2, 60, 15, "[ 1: Bash - Primary (ACTIVE) ]", 1);
     sessions[0].parser = parser_create();
 
-    // --- Session 1 (Secondary Window) உருவாக்குதல் ---
+    // --- Session 1 (Secondary Window) ---
     sessions[1].id = 1;
     sessions[1].pid = pty_spawn(shell_argv, &sessions[1].master_fd);
     sessions[1].win = window_create(2, 6, 15, 60, 15, "[ 2: Bash - Secondary ]", 0);
@@ -104,41 +105,50 @@ int main() {
 
         if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) == -1) break;
 
-        // --- 1. Keyboard Input (Stdin) ---
+        // --- Keyboard Input (Stdin) ---
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer));
             if (nread > 0) {
-                // Ctrl + Q (ASCII 17) = Engine-ல் இருந்து வெளியேற
+                // Ctrl + Q (ASCII 17) = Exit Engine
                 if (buffer[0] == 17) {
                     break;
                 }
-                // Ctrl + A (ASCII 1) = Window Switch Hotkey!
+                // Ctrl + A (ASCII 1) = Switch Windows
                 else if (buffer[0] == 1) {
-                    // பழைய Active விண்டோவை பின்னால் அனுப்பு (z_index = 0)
                     sessions[active_idx].win->z_index = 0;
                     sessions[active_idx].win->is_active = 0;
                     strncpy(sessions[active_idx].win->title, 
                             active_idx == 0 ? "[ 1: Bash - Primary ]" : "[ 2: Bash - Secondary ]", 63);
 
-                    // அடுத்த விண்டோவுக்கு Active-ஐ மாற்று
                     active_idx = 1 - active_idx;
 
-                    // புதிய Active விண்டோவை முன்னால் கொண்டு வா (z_index = 1)
                     sessions[active_idx].win->z_index = 1;
                     sessions[active_idx].win->is_active = 1;
                     strncpy(sessions[active_idx].win->title, 
                             active_idx == 0 ? "[ 1: Bash - Primary (ACTIVE) ]" : "[ 2: Bash - Secondary (ACTIVE) ]", 63);
 
                     render_all_sessions(scr, sessions, MAX_SESSIONS);
-                } 
-                // மற்ற எல்லா எழுத்துக்களையும் Active விண்டோவின் Shell-க்கு மட்டும் அனுப்பு
+                }
+                // Ctrl + P (ASCII 16) = Paste from Clipboard! <-- 3. PASTE HOTKEY
+                else if (buffer[0] == 16) {
+                    const char *paste_data = clipboard_get(engine_cb);
+                    if (strlen(paste_data) > 0) {
+                        write(sessions[active_idx].master_fd, paste_data, strlen(paste_data));
+                    }
+                }
+                // Ctrl + Y (ASCII 25) = Yank/Copy a new command! <-- 4. COPY HOTKEY
+                else if (buffer[0] == 25) {
+                    const char *new_cmd = "ls -la /home\n";
+                    clipboard_set(engine_cb, new_cmd, strlen(new_cmd));
+                }
+                // மற்ற எல்லா எழுத்துக்களையும் Active Shell-க்கு அனுப்பு
                 else {
                     write(sessions[active_idx].master_fd, buffer, nread);
                 }
             }
         }
 
-        // --- 2. Shell Output (PTY Master FDs) ---
+        // --- Shell Output (PTY Master FDs) ---
         int needs_render = 0;
         for (int i = 0; i < MAX_SESSIONS; i++) {
             if (FD_ISSET(sessions[i].master_fd, &read_fds)) {
@@ -163,6 +173,7 @@ int main() {
         window_destroy(sessions[i].win);
         close(sessions[i].master_fd);
     }
+    clipboard_destroy(engine_cb); // <-- 5. Clipboard Memory Cleanup
     screen_destroy(scr);
     printf("\r\nBDH Terminal Engine Exited Cleanly.\n\r");
     return EXIT_SUCCESS;
