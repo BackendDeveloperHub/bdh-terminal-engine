@@ -4,14 +4,18 @@
 
 #include "engine/screen.h"
 
+#define WIN_MAX_ROWS 25
+#define WIN_MAX_COLS 80
+
 typedef struct {
     int id;
-    int x, y;          // விண்டோ தொடங்கும் இடம் (Row, Col)
-    int width, height; // அகலம் மற்றும் உயரம்
-    int z_index;       // அடுக்கு வரிசை
-    char title[64];
-    int is_active;
-    int cur_r, cur_c;  // விண்டோவுக்கு உள்ளே கர்சர் இருக்கும் இடம் (Row, Col)
+    int x, y;          
+    int width, height; 
+    int z_index;       
+    char title[64];    
+    int is_active;     
+    int cur_r, cur_c;  
+    char text[WIN_MAX_ROWS][WIN_MAX_COLS]; // <-- விண்டோவின் சொந்த மெமரி (Backing Store)
 } FloatingWindow;
 
 FloatingWindow* window_create(int id, int x, int y, int width, int height, const char* title, int z_index);
