@@ -10,7 +10,8 @@
 #include "ui/panes.h"
 #include "engine/parser.h"
 #include "engine/clipboard.h"
-#include "engine/cursor.h" // <-- Cursor Header இணைக்கப்பட்டுள்ளது!
+#include "engine/cursor.h"
+#include "engine/input.h" // <-- 1. Input Module Header இணைக்கப்பட்டுள்ளது!
 
 #define MAX_SESSIONS 2
 
@@ -36,9 +37,8 @@ void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
-// கர்சரை மறைத்து, வரைந்து முடித்தபின் Active விண்டோவில் கொண்டு வந்து நிறுத்தும் பங்க்ஷன்
 void render_all_sessions(VirtualScreen *scr, TerminalSession sessions[], int count) {
-    cursor_hide(); // 1. ரெண்டர் செய்யும்போது கர்சரை மறைக்கிறோம்
+    cursor_hide();
     screen_clear(scr);
 
     // 1. Z-Index 0 (பின்னால் இருக்கும் விண்டோ)
@@ -68,7 +68,7 @@ void render_all_sessions(VirtualScreen *scr, TerminalSession sessions[], int cou
 
     // 4. Active விண்டோவின் உள்ளே கர்சரை கொண்டு வந்து நிறுத்துதல்!
     if (active_win) {
-        cursor_sync_to_window(active_win); // 2. பிளிங்க் ஆகும் கர்சரை ஒத்திசைக்கிறோம்
+        cursor_sync_to_window(active_win);
     } else {
         cursor_show();
     }
@@ -83,7 +83,7 @@ int main() {
     TerminalSession sessions[MAX_SESSIONS];
     int active_idx = 0;
 
-    // --- Engine Clipboard உருவாக்குதல் & Default Command Copy செய்தல் ---
+    // --- Engine Clipboard உருவாக்குதல் ---
     Clipboard *engine_cb = clipboard_create();
     const char *default_cmd = "echo BDH Clipboard Success!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
@@ -106,8 +106,9 @@ int main() {
     char buffer[1024];
     ssize_t nread;
     int max_fd = 0;
+    int engine_running = 1;
 
-    while (1) {
+    while (engine_running) {
         FD_ZERO(&read_fds);
         FD_SET(STDIN_FILENO, &read_fds);
         max_fd = STDIN_FILENO;
@@ -121,50 +122,55 @@ int main() {
 
         if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) == -1) break;
 
-        // --- Keyboard Input (Stdin) ---
+        // --- 1. Keyboard Input -> Input Module ---
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer));
             if (nread > 0) {
-                // Ctrl + Q (ASCII 17) = Exit Engine
-                if (buffer[0] == 17) {
-                    break;
-                }
-                // Ctrl + A (ASCII 1) = Switch Windows
-                else if (buffer[0] == 1) {
-                    sessions[active_idx].win->z_index = 0;
-                    sessions[active_idx].win->is_active = 0;
-                    strncpy(sessions[active_idx].win->title, 
-                            active_idx == 0 ? "[ 1: Bash - Primary ]" : "[ 2: Bash - Secondary ]", 63);
+                // Input Controller மூலம் என்ன Action என்று கண்டுபிடிக்கிறோம்:
+                InputAction action = input_parse_key(buffer[0], engine_cb, "ls -la /home\n");
 
-                    active_idx = 1 - active_idx;
+                switch (action) {
+                    case INPUT_ACTION_EXIT:
+                        engine_running = 0;
+                        break;
 
-                    sessions[active_idx].win->z_index = 1;
-                    sessions[active_idx].win->is_active = 1;
-                    strncpy(sessions[active_idx].win->title, 
-                            active_idx == 0 ? "[ 1: Bash - Primary (ACTIVE) ]" : "[ 2: Bash - Secondary (ACTIVE) ]", 63);
+                    case INPUT_ACTION_SWITCH_WIN:
+                        sessions[active_idx].win->z_index = 0;
+                        sessions[active_idx].win->is_active = 0;
+                        strncpy(sessions[active_idx].win->title, 
+                                active_idx == 0 ? "[ 1: Bash - Primary ]" : "[ 2: Bash - Secondary ]", 63);
 
-                    render_all_sessions(scr, sessions, MAX_SESSIONS);
-                }
-                // Ctrl + P (ASCII 16) = Paste from Clipboard!
-                else if (buffer[0] == 16) {
-                    const char *paste_data = clipboard_get(engine_cb);
-                    if (strlen(paste_data) > 0) {
-                        write(sessions[active_idx].master_fd, paste_data, strlen(paste_data));
+                        active_idx = 1 - active_idx;
+
+                        sessions[active_idx].win->z_index = 1;
+                        sessions[active_idx].win->is_active = 1;
+                        strncpy(sessions[active_idx].win->title, 
+                                active_idx == 0 ? "[ 1: Bash - Primary (ACTIVE) ]" : "[ 2: Bash - Secondary (ACTIVE) ]", 63);
+
+                        render_all_sessions(scr, sessions, MAX_SESSIONS);
+                        break;
+
+                    case INPUT_ACTION_PASTE: {
+                        const char *paste_data = clipboard_get(engine_cb);
+                        if (strlen(paste_data) > 0) {
+                            write(sessions[active_idx].master_fd, paste_data, strlen(paste_data));
+                        }
+                        break;
                     }
-                }
-                // Ctrl + Y (ASCII 25) = Yank/Copy a new command!
-                else if (buffer[0] == 25) {
-                    const char *new_cmd = "ls -la /home\n";
-                    clipboard_set(engine_cb, new_cmd, strlen(new_cmd));
-                }
-                // மற்ற எல்லா எழுத்துக்களையும் Active Shell-க்கு அனுப்பு
-                else {
-                    write(sessions[active_idx].master_fd, buffer, nread);
+
+                    case INPUT_ACTION_COPY:
+                        // Copy action input_parse_key உள்ளேயே clipboard_set செய்துவிட்டது!
+                        break;
+
+                    case INPUT_ACTION_NORMAL:
+                    default:
+                        write(sessions[active_idx].master_fd, buffer, nread);
+                        break;
                 }
             }
         }
 
-        // --- Shell Output (PTY Master FDs) ---
+        // --- 2. Shell Output (PTY Master FDs) ---
         int needs_render = 0;
         for (int i = 0; i < MAX_SESSIONS; i++) {
             if (FD_ISSET(sessions[i].master_fd, &read_fds)) {
