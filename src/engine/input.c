@@ -22,6 +22,10 @@ InputAction input_parse_key(char key, Clipboard *cb, const char *default_copy_te
         }
         return INPUT_ACTION_COPY;
     }
+    // Ctrl + B (ASCII 2) -> Open GUI Browser
+    else if (key == 2) {
+        return INPUT_ACTION_OPEN_BROWSER;
+    }
 
     // மற்ற எல்லா எழுத்துக்களும் சாதாரண Shell உள்ளீடுகள்
     return INPUT_ACTION_NORMAL;
