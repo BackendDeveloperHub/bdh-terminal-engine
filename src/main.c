@@ -31,16 +31,24 @@ int main() {
     // Terminal Module மூலம் Raw Mode ஆன் செய்யப்படுகிறது:
     terminal_enable_raw_mode();
 
-    // 1. லேப்டாப் ஸ்கிரீனின் அசல் அளவை எடுப்பது:
-    struct winsize ws;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+    // 1. லேப்டாப் / Termux டெர்மினலின் உண்மையான முழு அளவை (Full Screen Size) எடுப்பது:
+    struct winsize ws = {0};
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1) {
+        ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
+    }
+    
     int scr_rows = (ws.ws_row > 0) ? ws.ws_row : 38;
     int scr_cols = (ws.ws_col > 0) ? ws.ws_col : 135;
 
-    // 2. பார்டர்கள் போக உள்ளே இருக்கும் PTY அளவு (Full Inner Size):
+    // 2. பார்டர்கள் (2) போக உள்ளே இருக்கும் அசல் PTY அளவு (Full Width Inner Size):
     int pty_rows = scr_rows - 2;
     int pty_cols = scr_cols - 2;
 
+    // ஸ்கிரீன் சைஸ் என்ன கண்டுபிடிக்கப்பட்டது என்பதைத் தெரிந்துகொள்ள Debug Print:
+    printf("\r\n[BDH Engine] Detected Screen Size: %d cols x %d rows (PTY Inner: %d x %d)\r\n", 
+           scr_cols, scr_rows, pty_cols, pty_rows);
+
+    // 3. முழு ஸ்கிரீன் அளவுக்கு VirtualScreen உருவாக்குதல்:
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
     TerminalSession sessions[MAX_SESSIONS];
     int active_idx = 0;
@@ -50,7 +58,7 @@ int main() {
     const char *default_cmd = "echo BDH Clipboard Success!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
-    // 3. எல்லா டேப்களையும் முழு ஸ்கிரீன் அளவில் (x=0, y=0, scr_cols, scr_rows) உருவாக்குதல்!
+    // 4. எல்லா டேப்களையும் முழு ஸ்கிரீன் அளவில் (x=0, y=0, scr_cols, scr_rows) உருவாக்குதல்!
     // --- Session 0 (Primary Window) ---
     sessions[0].id = 0;
     sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd, pty_rows, pty_cols);
