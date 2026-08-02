@@ -12,7 +12,10 @@ FloatingWindow* window_create(int id, int x, int y, int width, int height, const
     win->width = width;
     win->height = height;
     win->z_index = z_index;
-    win->is_active = 1;
+    
+    // z_index == 1 ஆக இருந்தால் மட்டுமே Active (Bug Fixed):
+    win->is_active = (z_index == 1) ? 1 : 0;
+    
     win->cur_r = 0;
     win->cur_c = 0;
     strncpy(win->title, title, sizeof(win->title) - 1);
@@ -27,7 +30,7 @@ FloatingWindow* window_create(int id, int x, int y, int width, int height, const
     return win;
 }
 
-// 1. விண்டோ மெமரியை (win->text) ஒரு வரி மேலே நகர்த்தும் புதிய பங்க்ஷன் (Scroll Up):
+// 1. விண்டோ மெமரியை (win->text) ஒரு வரி மேலே நகர்த்தும் பங்க்ஷன் (Scroll Up):
 void window_scroll_up(FloatingWindow *win) {
     int inner_height = win->height - 2;
     int inner_width  = win->width - 2;
@@ -98,15 +101,14 @@ void window_put_char(VirtualScreen *scr, FloatingWindow *win, char ch) {
     }
     if (ch == '\n') {
         win->cur_r++;
-        // கீழ் பார்டரைத் தொட்டால், பழைய வரிகளை ஒரு வரி மேலே நகர்த்த வேண்டும் (Scroll Up):
         if (win->cur_r >= inner_height) {
             window_scroll_up(win);
-            win->cur_r = inner_height - 1; // கர்சரை கடைசி வரியிலேயே நிறுத்துதல்
+            win->cur_r = inner_height - 1;
         }
         return;
     }
 
-    // Backspace ஆதரவு (Backspace key handling)
+    // Backspace ஆதரவு
     if (ch == '\b' || ch == 127) {
         if (win->cur_c > 0) {
             win->cur_c--;
@@ -119,14 +121,13 @@ void window_put_char(VirtualScreen *scr, FloatingWindow *win, char ch) {
 
     if (ch >= 32 && ch <= 126) {
         if (win->cur_r < WIN_MAX_ROWS && win->cur_c < WIN_MAX_COLS) {
-            win->text[win->cur_r][win->cur_c] = ch; // மெமரியில் சேமிக்கிறோம்!
+            win->text[win->cur_r][win->cur_c] = ch;
         }
 
         win->cur_c++;
         if (win->cur_c >= inner_width) {
             win->cur_c = 0;
             win->cur_r++;
-            // இங்கேயும் கீழ் பார்டரைத் தொட்டால் Scroll Up செய்ய வேண்டும்:
             if (win->cur_r >= inner_height) {
                 window_scroll_up(win);
                 win->cur_r = inner_height - 1;
