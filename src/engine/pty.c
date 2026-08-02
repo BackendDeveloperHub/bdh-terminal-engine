@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/ioctl.h> // <-- struct winsize-க்காக சேர்க்கப்பட்டுள்ளது
+#include <sys/ioctl.h>
 
 #ifdef __linux__
 #include <pty.h>
@@ -14,23 +14,22 @@
 #include <util.h>
 #endif
 
-// Parent-ல் இருக்கும் environment variables-ஐ ஆக்சஸ் பண்ண
 extern char **environ;
 
-pid_t pty_spawn(char *const argv[], int *master_fd) {
+// rows மற்றும் cols ஆர்குமெண்டுகள் சேர்க்கப்பட்டுள்ளன:
+pid_t pty_spawn(char *const argv[], int *master_fd, int rows, int cols) {
     int slave_fd;
     char slave_name[1024];
     pid_t pid;
 
-    // விண்டோவின் புதிய பெரிய உள்-அளவை (98 columns, 22 rows) PTY-க்குச் சொல்கிறோம்:
+    // நாம் அனுப்பும் அசல் அளவை PTY-க்குச் சொல்கிறோம்:
     struct winsize ws = {
-        .ws_row = 22,  // 24 - 2 (மேல் மற்றும் கீழ் பார்டர்கள் போக)
-        .ws_col = 98,  // 100 - 2 (இடது மற்றும் வலது பார்டர்கள் போக)
+        .ws_row = rows,
+        .ws_col = cols,
         .ws_xpixel = 0,
         .ws_ypixel = 0
     };
 
-    // openpty-ன் கடைசி ஆர்குமெண்டாக &ws கொடுக்கவும்:
     if (openpty(master_fd, &slave_fd, slave_name, NULL, &ws) == -1) {
         perror("[Error] openpty failed");
         return -1;
@@ -54,9 +53,6 @@ pid_t pty_spawn(char *const argv[], int *master_fd) {
 
         if (slave_fd > STDERR_FILENO) close(slave_fd);
 
-        // Execute the Shell with environment explicitly passed
-        printf("[Phase 1] Executing Shell with explicit env: %s\n", argv[0]);
-        // 'execvpe' enables path search and environment passing
         if (execvpe(argv[0], argv, environ) == -1) {
             perror("[Error] execvpe failed");
             _exit(EXIT_FAILURE);
@@ -64,10 +60,8 @@ pid_t pty_spawn(char *const argv[], int *master_fd) {
 
     } else { // Parent process
         close(slave_fd);
-        printf("[Phase 1] Parent Engine attached to Master PTY FD: %d\n", *master_fd);
-        printf("[Phase 1] Spawning shell (PID: %d)...\n", pid);
         return pid;
     }
 
-    return -1; // Should not reach
+    return -1;
 }
