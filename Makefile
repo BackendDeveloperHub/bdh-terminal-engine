@@ -1,6 +1,6 @@
 # Makefile
 CC = gcc
-PKGS = gtk+-3.0 webkit2gtk-4.0
+PKGS = gtk+-3.0 webkit2gtk-4.1
 
 # GTK & WebKit2GTK-க்கான CFLAGS மற்றும் LDFLAGS தானாகவே இணைக்கப்படுகிறது:
 CFLAGS = -Iinclude -Isrc -D_GNU_SOURCE $(shell pkg-config --cflags $(PKGS))
