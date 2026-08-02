@@ -10,9 +10,9 @@ typedef enum {
     INPUT_ACTION_EXIT,        // Ctrl + Q (Engine-ல் இருந்து வெளியேற)
     INPUT_ACTION_SWITCH_WIN,  // Ctrl + A (அடுத்த விண்டோவுக்கு மாற)
     INPUT_ACTION_PASTE,       // Ctrl + P (Clipboard-ல் இருந்து Paste செய்ய)
-    INPUT_ACTION_COPY ,
-    INPUT_ACTION_OPEN_BROWSER
-// Ctrl + Y (Clipboard-க்கு Copy செய்ய)
+    INPUT_ACTION_COPY ,       // Ctrl + Y (Clipboard-க்கு Copy செய்ய)
+    INPUT_ACTION_OPEN_BROWSER // ctrl +b 
+
 } InputAction;
 
 // கீபோர்டு உள்ளீட்டைப் பகுப்பாய்வு செய்யும் பங்க்ஷன்
