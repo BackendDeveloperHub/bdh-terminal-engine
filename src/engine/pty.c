@@ -16,13 +16,12 @@
 
 extern char **environ;
 
-// rows மற்றும் cols ஆர்குமெண்டுகள் சேர்க்கப்பட்டுள்ளன:
 pid_t pty_spawn(char *const argv[], int *master_fd, int rows, int cols) {
     int slave_fd;
     char slave_name[1024];
     pid_t pid;
 
-    // நாம் அனுப்பும் அசல் அளவை PTY-க்குச் சொல்கிறோம்:
+    // நாம் அனுப்பும் அசல் லேப்டாப் ஸ்கிரீன் அளவை PTY-க்குச் சொல்கிறோம்:
     struct winsize ws = {
         .ws_row = rows,
         .ws_col = cols,
