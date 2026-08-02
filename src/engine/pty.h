@@ -7,8 +7,8 @@
 #include <sys/types.h>
 
 // PTY-ஐ உருவாக்கி, புதிய Shell-ஐ Spawn செய்யும் பங்க்ஷன்
-// input: argv[] (எந்த shell run பண்ணனும்), master_fd (engine control FD)
+// input: argv[] (எந்த shell run பண்ணனும்), master_fd (engine control FD), rows (உள் உயரம்), cols (உள் அகலம்)
 // return: Child Process ID (PID)
-pid_t pty_spawn(char *const argv[], int *master_fd);
+pid_t pty_spawn(char *const argv[], int *master_fd, int rows, int cols);
 
 #endif // BDH_PTY_H
