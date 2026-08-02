@@ -82,9 +82,10 @@ void window_draw(VirtualScreen *scr, FloatingWindow *win) {
         }
     }
 
-    // 3. விண்டோ தலைப்பு (Title Bar)
+    // 3. விண்டோ தலைப்பு (Title Bar) - இடது மேல் மூலையில் (Top-Left Corner) தெளிவாகக் காட்டுதல்!
     int title_len = strlen(win->title);
-    int title_pos = start_c + (win->width - title_len) / 2;
+    int title_pos = start_c + 3; // <-- Center-க்கு பதிலாக இடதுபக்கம் 3-வது இடத்திலிருந்து தொடங்கும்!
+    
     for (int i = 0; i < title_len && (title_pos + i) < end_c; i++) {
         screen_put_char(scr, start_r, title_pos + i, win->title[i]);
     }
