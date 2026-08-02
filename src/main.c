@@ -31,35 +31,36 @@ int main() {
     // Terminal Module மூலம் Raw Mode ஆன் செய்யப்படுகிறது:
     terminal_enable_raw_mode();
 
-    // 1. உங்க லேப்டாப் டெர்மினலின் உண்மையான அளவை தானாகவே எடுப்பது:
+    // 1. லேப்டாப் ஸ்கிரீனின் அசல் அளவை எடுப்பது:
     struct winsize ws;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
     int scr_rows = (ws.ws_row > 0) ? ws.ws_row : 38;
     int scr_cols = (ws.ws_col > 0) ? ws.ws_col : 135;
 
-    // 2. முழு லேப்டாப் ஸ்கிரீன் அளவுக்கு VirtualScreen உருவாக்குதல்:
+    // 2. பார்டர்கள் போக உள்ளே இருக்கும் PTY அளவு (Full Inner Size):
+    int pty_rows = scr_rows - 2;
+    int pty_cols = scr_cols - 2;
+
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
     TerminalSession sessions[MAX_SESSIONS];
     int active_idx = 0;
 
-    // --- Engine Clipboard உருவாக்குதல் ---
+    // --- Engine Clipboard ---
     Clipboard *engine_cb = clipboard_create();
     const char *default_cmd = "echo BDH Clipboard Success!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
-    // 3. விண்டோக்களைப் பெரிய அளவில் (Width: 100, Height: 24) உருவாக்குதல்!
+    // 3. எல்லா டேப்களையும் முழு ஸ்கிரீன் அளவில் (x=0, y=0, scr_cols, scr_rows) உருவாக்குதல்!
     // --- Session 0 (Primary Window) ---
     sessions[0].id = 0;
-    // rows=22, cols=98 என்று PTY-க்குச் சரியாக அனுப்புகிறோம்:
-    sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd, 22, 98);
-    sessions[0].win = window_create(1, 1, 2, 100, 24, "[ 1: Bash - Primary (ACTIVE) ]", 1);
+    sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd, pty_rows, pty_cols);
+    sessions[0].win = window_create(0, 0, 0, scr_cols, scr_rows, "[ 1: Bash - Primary (ACTIVE) ]", 1);
     sessions[0].parser = parser_create();
 
     // --- Session 1 (Secondary Window) ---
     sessions[1].id = 1;
-    // rows=22, cols=98 என்று PTY-க்குச் சரியாக அனுப்புகிறோம்:
-    sessions[1].pid = pty_spawn(shell_argv, &sessions[1].master_fd, 22, 98);
-    sessions[1].win = window_create(2, 5, 8, 100, 24, "[ 2: Bash - Secondary ]", 0);
+    sessions[1].pid = pty_spawn(shell_argv, &sessions[1].master_fd, pty_rows, pty_cols);
+    sessions[1].win = window_create(1, 0, 0, scr_cols, scr_rows, "[ 2: Bash - Secondary ]", 0);
     sessions[1].parser = parser_create();
 
     // Renderer Module மூலம் விண்டோக்கள் வரையப்படுகின்றன:
