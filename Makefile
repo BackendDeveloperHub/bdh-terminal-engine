@@ -24,8 +24,7 @@ all: $(TARGET)
 # தேவைப்படும் GTK மற்றும் WebKit லைப்ரரிகளை ஆட்டோமேட்டிக்காக செக் செய்து இன்ஸ்டால் செய்ய:
 deps:
 	@echo "Checking and installing required system packages..."
-	sudo pacman -S --needed gtk3 webkit2gtk
-
+	sudo pacman -S --needed gtk3 webkit2gtk-4.1
 $(TARGET): deps $(SRCS)
 	$(CC) $(SRCS) $(CFLAGS) $(LDFLAGS) -o $(TARGET)
 	@echo "BDH Engine built successfully with GUI Browser! 🚀"
