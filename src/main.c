@@ -14,6 +14,7 @@
 #include "engine/input.h"
 #include "engine/renderer.h"
 #include "engine/terminal.h"
+#include "engine/browser.h" // <-- 1. Browser Header சேர்க்கப்பட்டுள்ளது!
 
 #define MAX_SESSIONS 2
 
@@ -52,6 +53,9 @@ int main() {
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
     TerminalSession sessions[MAX_SESSIONS];
     int active_idx = 0;
+
+    // --- Browser UI Tracker ---
+    BrowserWindow *my_browser = NULL; // <-- 2. பிரவுசருக்கான Pointer
 
     // --- Engine Clipboard ---
     Clipboard *engine_cb = clipboard_create();
@@ -124,6 +128,18 @@ int main() {
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         break;
 
+                    // --- 3. புதிய Browser Integration Handling ---
+                    case INPUT_ACTION_OPEN_BROWSER:
+                        if (my_browser == NULL) {
+                            my_browser = browser_create("BDH GUI Browser", 1200, 800);
+                            browser_load_url(my_browser, "https://github.com/BackendDeveloperHub");
+                            gtk_widget_show_all(my_browser->window);
+                        } else {
+                            // ஏற்கனவே பிரவுசர் திறந்திருந்தால் அதை முன்னால் கொண்டு வருதல் (Focus)
+                            gtk_window_present(GTK_WINDOW(my_browser->window));
+                        }
+                        break;
+
                     case INPUT_ACTION_PASTE: {
                         const char *paste_data = clipboard_get(engine_cb);
                         if (strlen(paste_data) > 0) {
@@ -168,6 +184,12 @@ int main() {
         window_destroy(sessions[i].win);
         close(sessions[i].master_fd);
     }
+    
+    // 4. பிரவுசர் மெமரியை சுத்தம் செய்தல்:
+    if (my_browser != NULL) {
+        browser_destroy(my_browser);
+    }
+    
     clipboard_destroy(engine_cb);
     screen_destroy(scr);
     printf("\r\nBDH Terminal Engine Exited Cleanly.\n\r");
