@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/select.h>
-#include <sys/ioctl.h> // <-- 1. லேப்டாப் ஸ்கிரீன் அளவை எடுப்பதற்காக சேர்க்கப்பட்டுள்ளது
+#include <sys/ioctl.h>
 #include <string.h>
 #include "engine/pty.h"
 #include "engine/screen.h"
@@ -50,13 +50,15 @@ int main() {
     // 3. விண்டோக்களைப் பெரிய அளவில் (Width: 100, Height: 24) உருவாக்குதல்!
     // --- Session 0 (Primary Window) ---
     sessions[0].id = 0;
-    sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd);
+    // rows=22, cols=98 என்று PTY-க்குச் சரியாக அனுப்புகிறோம்:
+    sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd, 22, 98);
     sessions[0].win = window_create(1, 1, 2, 100, 24, "[ 1: Bash - Primary (ACTIVE) ]", 1);
     sessions[0].parser = parser_create();
 
     // --- Session 1 (Secondary Window) ---
     sessions[1].id = 1;
-    sessions[1].pid = pty_spawn(shell_argv, &sessions[1].master_fd);
+    // rows=22, cols=98 என்று PTY-க்குச் சரியாக அனுப்புகிறோம்:
+    sessions[1].pid = pty_spawn(shell_argv, &sessions[1].master_fd, 22, 98);
     sessions[1].win = window_create(2, 5, 8, 100, 24, "[ 2: Bash - Secondary ]", 0);
     sessions[1].parser = parser_create();
 
