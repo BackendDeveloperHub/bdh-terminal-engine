@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <termios.h>
 #include <sys/select.h>
 #include <string.h>
 #include "engine/pty.h"
@@ -11,7 +10,9 @@
 #include "engine/parser.h"
 #include "engine/clipboard.h"
 #include "engine/cursor.h"
-#include "engine/input.h" // <-- 1. Input Module Header இணைக்கப்பட்டுள்ளது!
+#include "engine/input.h"
+#include "engine/renderer.h" // <-- 1. Renderer Module இணைக்கப்பட்டுள்ளது!
+#include "engine/terminal.h" // <-- 2. Terminal Module இணைக்கப்பட்டுள்ளது!
 
 #define MAX_SESSIONS 2
 
@@ -23,61 +24,11 @@ typedef struct {
     AnsiParser *parser;
 } TerminalSession;
 
-struct termios orig_termios;
-
-void disable_raw_mode() {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-}
-
-void enable_raw_mode() {
-    tcgetattr(STDIN_FILENO, &orig_termios);
-    atexit(disable_raw_mode);
-    struct termios raw = orig_termios;
-    cfmakeraw(&raw);
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-}
-
-void render_all_sessions(VirtualScreen *scr, TerminalSession sessions[], int count) {
-    cursor_hide();
-    screen_clear(scr);
-
-    // 1. Z-Index 0 (பின்னால் இருக்கும் விண்டோ)
-    for (int i = 0; i < count; i++) {
-        if (sessions[i].win->z_index == 0) {
-            window_draw(scr, sessions[i].win);
-        }
-    }
-    // 2. Z-Index 1 (Active விண்டோ - முன்னால் மிதப்பது)
-    FloatingWindow *active_win = NULL;
-    for (int i = 0; i < count; i++) {
-        if (sessions[i].win->z_index == 1) {
-            window_draw(scr, sessions[i].win);
-            active_win = sessions[i].win;
-        }
-    }
-
-    // 3. திரையில் பிரிண்ட் செய்தல்
-    printf("\033[2J\033[H");
-    for (int r = 0; r < scr->rows; r++) {
-        for (int c = 0; c < scr->cols; c++) {
-            putchar(scr->grid[r][c].ch);
-        }
-        putchar('\r');
-        putchar('\n');
-    }
-
-    // 4. Active விண்டோவின் உள்ளே கர்சரை கொண்டு வந்து நிறுத்துதல்!
-    if (active_win) {
-        cursor_sync_to_window(active_win);
-    } else {
-        cursor_show();
-    }
-    fflush(stdout);
-}
-
 int main() {
     char *shell_argv[] = {"/bin/bash", NULL};
-    enable_raw_mode();
+    
+    // Terminal Module மூலம் Raw Mode ஆன் செய்யப்படுகிறது:
+    terminal_enable_raw_mode();
 
     VirtualScreen *scr = screen_create(24, 80);
     TerminalSession sessions[MAX_SESSIONS];
@@ -100,7 +51,8 @@ int main() {
     sessions[1].win = window_create(2, 6, 15, 60, 15, "[ 2: Bash - Secondary ]", 0);
     sessions[1].parser = parser_create();
 
-    render_all_sessions(scr, sessions, MAX_SESSIONS);
+    // Renderer Module மூலம் விண்டோக்கள் வரையப்படுகின்றன:
+    renderer_draw_all(scr, sessions, MAX_SESSIONS);
 
     fd_set read_fds;
     char buffer[1024];
@@ -147,7 +99,7 @@ int main() {
                         strncpy(sessions[active_idx].win->title, 
                                 active_idx == 0 ? "[ 1: Bash - Primary (ACTIVE) ]" : "[ 2: Bash - Secondary (ACTIVE) ]", 63);
 
-                        render_all_sessions(scr, sessions, MAX_SESSIONS);
+                        renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         break;
 
                     case INPUT_ACTION_PASTE: {
@@ -159,7 +111,6 @@ int main() {
                     }
 
                     case INPUT_ACTION_COPY:
-                        // Copy action input_parse_key உள்ளேயே clipboard_set செய்துவிட்டது!
                         break;
 
                     case INPUT_ACTION_NORMAL:
@@ -185,7 +136,7 @@ int main() {
         }
 
         if (needs_render) {
-            render_all_sessions(scr, sessions, MAX_SESSIONS);
+            renderer_draw_all(scr, sessions, MAX_SESSIONS);
         }
     }
 
