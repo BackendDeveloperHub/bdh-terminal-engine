@@ -11,7 +11,7 @@ AnsiParser* parser_create() {
 void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *win, char ch) {
     switch (parser->state) {
         case STATE_NORMAL:
-            if (ch == '\033') { // Escape Byte (0x1B) வந்திருக்கிறது
+            if (ch == '\033') { // Escape Byte (0x1B)
                 parser->state = STATE_ESC;
             } else {
                 window_put_char(scr, win, ch); // சாதாரண எழுத்து - விண்டோவில் எழுது
@@ -31,11 +31,27 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
 
         case STATE_CSI:
             // CSI குறியீடுகள் எப்போதும் 0x40 ('@') முதல் 0x7E ('~') வரையிலான எழுத்துக்களில் முடியும்
-            // எ.கா: 'm' (color), 'h'/'l' (mode like ?2004h), 'J'/'K' (clear), 'A'..'D' (cursor)
             if (ch >= 0x40 && ch <= 0x7E) {
+                // --- புதிய CSI எஸ்கேப் கோடு கையாளுதல் (Handlers) ---
+                if (ch == 'K') {
+                    // \033[K -> கர்சர் இருக்கும் இடத்திலிருந்து வரியின் கடைசி வரை அழித்தல் (Erase to End of Line)
+                    for (int c = win->cur_c; c < win->width - 1; c++) {
+                        win->grid[win->cur_r][c].ch = ' ';
+                    }
+                } 
+                else if (ch == 'J') {
+                    // \033[2J -> விண்டோவை முழுமையாகத் துடைத்தல் (Clear Display)
+                    for (int r = 0; r < win->height - 2; r++) {
+                        for (int c = 0; c < win->width - 2; c++) {
+                            win->grid[r][c].ch = ' ';
+                        }
+                    }
+                    win->cur_r = 0;
+                    win->cur_c = 0;
+                }
+
                 parser->state = STATE_NORMAL; // குறியீடு முடிந்தது! மீண்டும் Normal State-க்கு திரும்பு
             }
-            // அதுவரை நடுவில் வரும் எண்கள் ('2','0','0','4'), '?' போன்றவற்றை புறக்கணிக்கவும் (Ignore)
             break;
     }
 }
