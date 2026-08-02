@@ -62,13 +62,14 @@ int main() {
     // --- Session 0 (Primary Window) ---
     sessions[0].id = 0;
     sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd, pty_rows, pty_cols);
-    sessions[0].win = window_create(0, 0, 0, scr_cols, scr_rows, "[ 1: Bash - Primary (ACTIVE) ]", 1);
+    // இடது மேல் மூலையில் தெளிவாகத் தெரியும்படி புதிய Tab டைட்டில்:
+    sessions[0].win = window_create(0, 0, 0, scr_cols, scr_rows, "[ TAB 1/2 : PRIMARY BASH (ACTIVE) * ]", 1);
     sessions[0].parser = parser_create();
 
     // --- Session 1 (Secondary Window) ---
     sessions[1].id = 1;
     sessions[1].pid = pty_spawn(shell_argv, &sessions[1].master_fd, pty_rows, pty_cols);
-    sessions[1].win = window_create(1, 0, 0, scr_cols, scr_rows, "[ 2: Bash - Secondary ]", 0);
+    sessions[1].win = window_create(1, 0, 0, scr_cols, scr_rows, "[ TAB 2/2 : SECONDARY BASH ]", 0);
     sessions[1].parser = parser_create();
 
     // Renderer Module மூலம் விண்டோக்கள் வரையப்படுகின்றன:
@@ -106,17 +107,19 @@ int main() {
                         break;
 
                     case INPUT_ACTION_SWITCH_WIN:
+                        // பழைய Active விண்டோவை Inactive ஆக மாற்றுகிறோம்:
                         sessions[active_idx].win->z_index = 0;
                         sessions[active_idx].win->is_active = 0;
                         strncpy(sessions[active_idx].win->title, 
-                                active_idx == 0 ? "[ 1: Bash - Primary ]" : "[ 2: Bash - Secondary ]", 63);
+                                active_idx == 0 ? "[ TAB 1/2 : PRIMARY BASH ]" : "[ TAB 2/2 : SECONDARY BASH ]", 63);
 
                         active_idx = 1 - active_idx;
 
+                        // புதிய விண்டோவை Active ஆக மாற்றுகிறோம்:
                         sessions[active_idx].win->z_index = 1;
                         sessions[active_idx].win->is_active = 1;
                         strncpy(sessions[active_idx].win->title, 
-                                active_idx == 0 ? "[ 1: Bash - Primary (ACTIVE) ]" : "[ 2: Bash - Secondary (ACTIVE) ]", 63);
+                                active_idx == 0 ? "[ TAB 1/2 : PRIMARY BASH (ACTIVE) * ]" : "[ TAB 2/2 : SECONDARY BASH (ACTIVE) * ]", 63);
 
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         break;
