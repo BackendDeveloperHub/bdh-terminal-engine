@@ -1,34 +1,48 @@
-// src/browser.c - BDH Custom GUI Web Browser
-#include <gtk/gtk.h>
-#include <webkit2/webkit2.h>
+// src/engine/browser.c
+#include "browser.h"
+#include <stdlib.h>
+#include <string.h>
 
-static void destroy_cb(GtkWidget *widget, gpointer data) {
+static void on_window_destroy(GtkWidget *widget, gpointer data) {
     gtk_main_quit();
 }
 
-int main(int argc, char *argv[]) {
-    // 1. GTK Engine-ஐத் தொடங்குதல்
-    gtk_init(&argc, &argv);
+BrowserWindow* browser_create(const char *title, int width, int height) {
+    BrowserWindow *browser = (BrowserWindow*)malloc(sizeof(BrowserWindow));
 
-    // 2. மெயின் GUI விண்டோ உருவாக்குதல்
-    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_default_size(GTK_WINDOW(window), 1200, 800);
-    gtk_window_set_title(GTK_WINDOW(window), "BDH GUI Browser - Lightweight");
+    // 1. Main Window உருவாக்குதல்
+    browser->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_default_size(GTK_WINDOW(browser->window), width, height);
+    gtk_window_set_title(GTK_WINDOW(browser->window), title);
 
-    // 3. WebKit Browser View உருவாக்குதல்
-    GtkWidget *webview = webkit_web_view_new();
-    gtk_container_add(GTK_CONTAINER(window), webview);
+    // 2. Layout Box
+    browser->vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_container_add(GTK_CONTAINER(browser->window), browser->vbox);
 
-    // 4. விரும்பிய URL-ஐ லோட் செய்தல் (Default: Google / Custom URL)
-    const char *url = (argc > 1) ? argv[1] : "https://www.google.com";
-    webkit_web_view_load_uri(WEBKIT_WEB_VIEW(webview), url);
+    // 3. WebKit WebView உருவாக்குதல்
+    browser->webview = webkit_web_view_new();
+    gtk_box_pack_start(GTK_BOX(browser->vbox), browser->webview, TRUE, TRUE, 0);
 
-    // 5. விண்டோவை மூடும் நிகழ்வை இணைத்தல்
-    g_signal_connect(window, "destroy", G_CALLBACK(destroy_cb), NULL);
+    // 4. Close Event இணைத்தல்
+    g_signal_connect(browser->window, "destroy", G_CALLBACK(on_window_destroy), NULL);
+
+    return browser;
+}
+
+void browser_load_url(BrowserWindow *browser, const char *url) {
+    if (!browser || !browser->webview || !url) return;
     
-    // 6. திரையில் காட்டுதல்
-    gtk_widget_show_all(window);
-    gtk_main();
+    if (g_str_has_prefix(url, "http://") || g_str_has_prefix(url, "https://")) {
+        webkit_web_view_load_uri(WEBKIT_WEB_VIEW(browser->webview), url);
+    } else {
+        char full_url[1024];
+        snprintf(full_url, sizeof(full_url), "https://%s", url);
+        webkit_web_view_load_uri(WEBKIT_WEB_VIEW(browser->webview), full_url);
+    }
+}
 
-    return 0;
+void browser_destroy(BrowserWindow *browser) {
+    if (browser) {
+        free(browser);
+    }
 }
