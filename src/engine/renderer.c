@@ -2,7 +2,6 @@
 #include "renderer.h"
 #include <stdio.h>
 
-// TerminalSession அமைப்பு main.c-ல் உள்ள அதே கட்டமைப்பைக் குறிக்கிறது
 typedef struct {
     int id;
     int master_fd;
@@ -14,22 +13,17 @@ typedef struct {
 void renderer_draw_all(VirtualScreen *scr, void *sessions_ptr, int count) {
     SessionRef *sessions = (SessionRef*)sessions_ptr;
     
-    cursor_hide(); // ரெண்டர் செய்யும் போது கர்சர் துள்ளுவதைத் தடுக்க
+    cursor_hide(); // 1. ரெண்டர் செய்யும் போது கர்சர் துள்ளுவதைத் தடுக்க
     screen_clear(scr);
 
-    // 1. முதலில் Z-Index 0 (பின்னால் இருக்கும் விண்டோ) வரைதல்
-    for (int i = 0; i < count; i++) {
-        if (sessions[i].win->z_index == 0) {
-            window_draw(scr, sessions[i].win);
-        }
-    }
-
-    // 2. அடுத்து Z-Index 1 (Active விண்டோ - முன்னால் மிதப்பது) வரைதல்
+    // 2. எந்த டேப் Active-ஆக (is_active == 1) இருக்கிறதோ அதை மட்டும் வரைதல்!
+    // பின்னாடி இருக்கும் டேப்கள் (Inactive Tabs) வரையப்படாது!
     FloatingWindow *active_win = NULL;
     for (int i = 0; i < count; i++) {
-        if (sessions[i].win->z_index == 1) {
+        if (sessions[i].win->is_active == 1) {
             window_draw(scr, sessions[i].win);
             active_win = sessions[i].win;
+            break; // Active டேப்பை வரைந்ததும் லூப்பை முடித்துவிடலாம்
         }
     }
 
