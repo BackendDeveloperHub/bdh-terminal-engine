@@ -35,15 +35,16 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 // --- புதிய CSI எஸ்கேப் கோடு கையாளுதல் (Handlers) ---
                 if (ch == 'K') {
                     // \033[K -> கர்சர் இருக்கும் இடத்திலிருந்து வரியின் கடைசி வரை அழித்தல் (Erase to End of Line)
-                    for (int c = win->cur_c; c < win->width - 1; c++) {
-                        win->grid[win->cur_r][c].ch = ' ';
+                    int abs_r = win->x + 1 + win->cur_r;
+                    for (int c = win->cur_c; c < win->width - 2; c++) {
+                        scr->grid[abs_r][win->y + 1 + c].ch = ' ';
                     }
                 } 
                 else if (ch == 'J') {
                     // \033[2J -> விண்டோவை முழுமையாகத் துடைத்தல் (Clear Display)
                     for (int r = 0; r < win->height - 2; r++) {
                         for (int c = 0; c < win->width - 2; c++) {
-                            win->grid[r][c].ch = ' ';
+                            scr->grid[win->x + 1 + r][win->y + 1 + c].ch = ' ';
                         }
                     }
                     win->cur_r = 0;
