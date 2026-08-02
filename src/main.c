@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/select.h>
+#include <sys/ioctl.h> // <-- 1. லேப்டாப் ஸ்கிரீன் அளவை எடுப்பதற்காக சேர்க்கப்பட்டுள்ளது
 #include <string.h>
 #include "engine/pty.h"
 #include "engine/screen.h"
@@ -11,8 +12,8 @@
 #include "engine/clipboard.h"
 #include "engine/cursor.h"
 #include "engine/input.h"
-#include "engine/renderer.h" // <-- 1. Renderer Module இணைக்கப்பட்டுள்ளது!
-#include "engine/terminal.h" // <-- 2. Terminal Module இணைக்கப்பட்டுள்ளது!
+#include "engine/renderer.h"
+#include "engine/terminal.h"
 
 #define MAX_SESSIONS 2
 
@@ -30,7 +31,14 @@ int main() {
     // Terminal Module மூலம் Raw Mode ஆன் செய்யப்படுகிறது:
     terminal_enable_raw_mode();
 
-    VirtualScreen *scr = screen_create(24, 80);
+    // 1. உங்க லேப்டாப் டெர்மினலின் உண்மையான அளவை தானாகவே எடுப்பது:
+    struct winsize ws;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+    int scr_rows = (ws.ws_row > 0) ? ws.ws_row : 38;
+    int scr_cols = (ws.ws_col > 0) ? ws.ws_col : 135;
+
+    // 2. முழு லேப்டாப் ஸ்கிரீன் அளவுக்கு VirtualScreen உருவாக்குதல்:
+    VirtualScreen *scr = screen_create(scr_rows, scr_cols);
     TerminalSession sessions[MAX_SESSIONS];
     int active_idx = 0;
 
@@ -39,16 +47,17 @@ int main() {
     const char *default_cmd = "echo BDH Clipboard Success!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
+    // 3. விண்டோக்களைப் பெரிய அளவில் (Width: 100, Height: 24) உருவாக்குதல்!
     // --- Session 0 (Primary Window) ---
     sessions[0].id = 0;
     sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd);
-    sessions[0].win = window_create(1, 1, 2, 60, 15, "[ 1: Bash - Primary (ACTIVE) ]", 1);
+    sessions[0].win = window_create(1, 1, 2, 100, 24, "[ 1: Bash - Primary (ACTIVE) ]", 1);
     sessions[0].parser = parser_create();
 
     // --- Session 1 (Secondary Window) ---
     sessions[1].id = 1;
     sessions[1].pid = pty_spawn(shell_argv, &sessions[1].master_fd);
-    sessions[1].win = window_create(2, 6, 15, 60, 15, "[ 2: Bash - Secondary ]", 0);
+    sessions[1].win = window_create(2, 5, 8, 100, 24, "[ 2: Bash - Secondary ]", 0);
     sessions[1].parser = parser_create();
 
     // Renderer Module மூலம் விண்டோக்கள் வரையப்படுகின்றன:
@@ -78,7 +87,6 @@ int main() {
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer));
             if (nread > 0) {
-                // Input Controller மூலம் என்ன Action என்று கண்டுபிடிக்கிறோம்:
                 InputAction action = input_parse_key(buffer[0], engine_cb, "ls -la /home\n");
 
                 switch (action) {
