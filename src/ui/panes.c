@@ -27,6 +27,27 @@ FloatingWindow* window_create(int id, int x, int y, int width, int height, const
     return win;
 }
 
+// 1. விண்டோ மெமரியை (win->text) ஒரு வரி மேலே நகர்த்தும் புதிய பங்க்ஷன் (Scroll Up):
+void window_scroll_up(FloatingWindow *win) {
+    int inner_height = win->height - 2;
+    int inner_width  = win->width - 2;
+
+    // Row 1 முதல் கடைசி வரை உள்ள எழுத்துக்களை ஒரு வரி மேலே (Row 0-க்கு) நகர்த்துதல்:
+    for (int r = 0; r < inner_height - 1 && r < WIN_MAX_ROWS - 1; r++) {
+        for (int c = 0; c < inner_width && c < WIN_MAX_COLS; c++) {
+            win->text[r][c] = win->text[r + 1][c];
+        }
+    }
+
+    // கடைசி வரியை (Bottom row) காலியாக்குதல் (Spaces):
+    int last_r = inner_height - 1;
+    if (last_r < WIN_MAX_ROWS) {
+        for (int c = 0; c < inner_width && c < WIN_MAX_COLS; c++) {
+            win->text[last_r][c] = ' ';
+        }
+    }
+}
+
 void window_draw(VirtualScreen *scr, FloatingWindow *win) {
     int start_r = win->x;
     int end_r = win->x + win->height - 1;
@@ -66,7 +87,7 @@ void window_draw(VirtualScreen *scr, FloatingWindow *win) {
     }
 }
 
-// Bash எழுத்துக்களை விண்டோவின் சொந்த மெமரியில் (win->text) சேமித்தல்
+// 2. மாற்றியமைக்கப்பட்ட window_put_char (Scrolling + Backspace ஆதரவுடன்)
 void window_put_char(VirtualScreen *scr, FloatingWindow *win, char ch) {
     int inner_width = win->width - 2;
     int inner_height = win->height - 2;
@@ -77,21 +98,39 @@ void window_put_char(VirtualScreen *scr, FloatingWindow *win, char ch) {
     }
     if (ch == '\n') {
         win->cur_r++;
-        win->cur_c = 0;
-        if (win->cur_r >= inner_height) win->cur_r = 0;
+        // கீழ் பார்டரைத் தொட்டால், பழைய வரிகளை ஒரு வரி மேலே நகர்த்த வேண்டும் (Scroll Up):
+        if (win->cur_r >= inner_height) {
+            window_scroll_up(win);
+            win->cur_r = inner_height - 1; // கர்சரை கடைசி வரியிலேயே நிறுத்துதல்
+        }
+        return;
+    }
+
+    // Backspace ஆதரவு (Backspace key handling)
+    if (ch == '\b' || ch == 127) {
+        if (win->cur_c > 0) {
+            win->cur_c--;
+            if (win->cur_r < WIN_MAX_ROWS && win->cur_c < WIN_MAX_COLS) {
+                win->text[win->cur_r][win->cur_c] = ' ';
+            }
+        }
         return;
     }
 
     if (ch >= 32 && ch <= 126) {
         if (win->cur_r < WIN_MAX_ROWS && win->cur_c < WIN_MAX_COLS) {
-            win->text[win->cur_r][win->cur_c] = ch; // <-- மெமரியில் சேமிக்கிறோம்!
+            win->text[win->cur_r][win->cur_c] = ch; // மெமரியில் சேமிக்கிறோம்!
         }
 
         win->cur_c++;
         if (win->cur_c >= inner_width) {
             win->cur_c = 0;
             win->cur_r++;
-            if (win->cur_r >= inner_height) win->cur_r = 0;
+            // இங்கேயும் கீழ் பார்டரைத் தொட்டால் Scroll Up செய்ய வேண்டும்:
+            if (win->cur_r >= inner_height) {
+                window_scroll_up(win);
+                win->cur_r = inner_height - 1;
+            }
         }
     }
 }
