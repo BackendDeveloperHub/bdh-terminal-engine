@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/ioctl.h> // <-- 1. struct winsize-க்காக சேர்க்கப்பட்டுள்ளது
+#include <sys/ioctl.h> // <-- struct winsize-க்காக சேர்க்கப்பட்டுள்ளது
 
 #ifdef __linux__
 #include <pty.h>
@@ -22,15 +22,15 @@ pid_t pty_spawn(char *const argv[], int *master_fd) {
     char slave_name[1024];
     pid_t pid;
 
-    // 2. விண்டோவின் உள் அளவை (58 columns, 13 rows) PTY-க்குச் சொல்கிறோம்:
+    // விண்டோவின் புதிய பெரிய உள்-அளவை (98 columns, 22 rows) PTY-க்குச் சொல்கிறோம்:
     struct winsize ws = {
-        .ws_row = 13,
-        .ws_col = 58,
+        .ws_row = 22,  // 24 - 2 (மேல் மற்றும் கீழ் பார்டர்கள் போக)
+        .ws_col = 98,  // 100 - 2 (இடது மற்றும் வலது பார்டர்கள் போக)
         .ws_xpixel = 0,
         .ws_ypixel = 0
     };
 
-    // 3. openpty-ன் கடைசி ஆர்குமெண்டாக &ws கொடுக்கவும்:
+    // openpty-ன் கடைசி ஆர்குமெண்டாக &ws கொடுக்கவும்:
     if (openpty(master_fd, &slave_fd, slave_name, NULL, &ws) == -1) {
         perror("[Error] openpty failed");
         return -1;
