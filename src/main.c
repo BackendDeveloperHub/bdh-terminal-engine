@@ -28,8 +28,11 @@ typedef struct {
 } TerminalSession;
 
 int main(int argc, char *argv[]) {
-    // 1. GTK Engine-ஐ ஆரம்பத்திலேயே Initialize செய்ய வேண்டும் (Crash Fix #1)
-    gtk_init(&argc, &argv);
+    // 1. Display இருக்கிறதா எனப் பார்க்கிறோம்; இல்லாவிட்டாலும் என்ஜின் கிராஷ் ஆகாது! (Smart GUI Check)
+    int gui_available = gtk_init_check(&argc, &argv);
+    if (!gui_available) {
+        printf("\r\n[BDH Engine] Notice: No GUI Display detected. Running in CLI Terminal Mode.\r\n");
+    }
 
     char *shell_argv[] = {"/bin/bash", NULL};
     
@@ -59,7 +62,7 @@ int main(int argc, char *argv[]) {
     int active_idx = 0;
 
     // --- Browser UI Tracker ---
-    BrowserWindow *my_browser = NULL; // <-- பிரவுசருக்கான Pointer
+    BrowserWindow *my_browser = NULL;
 
     // --- Engine Clipboard ---
     Clipboard *engine_cb = clipboard_create();
@@ -89,9 +92,11 @@ int main(int argc, char *argv[]) {
     int engine_running = 1;
 
     while (engine_running) {
-        // --- 2. GTK & WebKit Events-ஐ தடையின்றி இயங்க வைக்க (Crash Fix #2) ---
-        while (gtk_events_pending()) {
-            gtk_main_iteration();
+        // --- 2. GUI Display இருந்தால் மட்டுமே GTK & WebKit Events இயங்கும் ---
+        if (gui_available) {
+            while (gtk_events_pending()) {
+                gtk_main_iteration();
+            }
         }
 
         FD_ZERO(&read_fds);
@@ -105,7 +110,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // --- 3. 10ms Timeout கொடுப்பதால் GTK-வும் டெர்மினலும் பிளாக் ஆகாமல் இயங்கும் (Crash Fix #3) ---
+        // --- 3. 10ms Timeout கொடுப்பதால் GTK-வும் டெர்மினலும் பிளாக் ஆகாமல் இயங்கும் ---
         struct timeval tv = {0, 10000}; // 10ms
         if (select(max_fd + 1, &read_fds, NULL, NULL, &tv) == -1) break;
 
@@ -140,16 +145,17 @@ int main(int argc, char *argv[]) {
 
                     // --- Safe Browser Integration Handling ---
                     case INPUT_ACTION_OPEN_BROWSER:
-                        if (my_browser == NULL) {
-                            my_browser = browser_create("BDH GUI Browser", 1200, 800);
-                            if (my_browser != NULL && my_browser->window != NULL) {
-                                browser_load_url(my_browser, "https://github.com/BackendDeveloperHub");
-                                gtk_widget_show_all(my_browser->window);
-                            }
-                        } else {
-                            // ஏற்கனவே பிரவுசர் திறந்திருந்தால் அதை முன்னால் கொண்டு வருதல் (Focus)
-                            if (my_browser->window != NULL) {
-                                gtk_window_present(GTK_WINDOW(my_browser->window));
+                        if (gui_available) {
+                            if (my_browser == NULL) {
+                                my_browser = browser_create("BDH GUI Browser", 1200, 800);
+                                if (my_browser != NULL && my_browser->window != NULL) {
+                                    browser_load_url(my_browser, "https://github.com/BackendDeveloperHub");
+                                    gtk_widget_show_all(my_browser->window);
+                                }
+                            } else {
+                                if (my_browser->window != NULL) {
+                                    gtk_window_present(GTK_WINDOW(my_browser->window));
+                                }
                             }
                         }
                         break;
