@@ -27,7 +27,7 @@ typedef struct {
 } TerminalSession;
 
 int main(int argc, char *argv[]) {
-    printf("\r\n[BDH Engine] Starting in 100%% Pure CLI Mode (Terminal Browser Enabled)...\r\n");
+    printf("\r\n[BDH Engine] Starting in 100%% Pure CLI Mode (Glitch-Free Terminal Browser Enabled)...\r\n");
 
     char *shell_argv[] = {"/bin/bash", NULL};
     
@@ -77,7 +77,8 @@ int main(int argc, char *argv[]) {
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
 
     fd_set read_fds;
-    char buffer[1024];
+    // --- மாற்றம் 1: Buffer அளவை 16KB (16384 Bytes) ஆக அதிகரித்துள்ளோம் (Anti-Glitch Fix) ---
+    char buffer[16384];
     ssize_t nread;
     int max_fd = 0;
     int engine_running = 1;
@@ -125,11 +126,10 @@ int main(int argc, char *argv[]) {
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         break;
 
-                    // --- 100% CLI Browser Integration (Gzip Error Fixed!) ---
+                    // --- மாற்றம் 2: Overlapping எரரைத் தவிர்க்க 'links' பிரவுசர் பயன்பாடு ---
                     case INPUT_ACTION_OPEN_BROWSER: {
-                        // -o accept_encoding= சேர்ப்பதால் gzip compression error வராது!
-                        // (அல்லது நீங்கள் links இன்ஸ்டால் செய்திருந்தால் "links https://github.com..." என்றும் கொடுக்கலாம்)
-                        const char *browser_cmd = "w3m -o accept_encoding= https://github.com/BackendDeveloperHub\n";
+                        // w3m-ன் partial redraws பிரச்சனை வராமல் இருக்க links பயன்படுத்துகிறோம்:
+                        const char *browser_cmd = "links https://github.com/BackendDeveloperHub\n";
                         write(sessions[active_idx].master_fd, browser_cmd, strlen(browser_cmd));
                         break;
                     }
@@ -153,10 +153,11 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // --- 2. Shell Output (PTY Master FDs) ---
+        // --- 2. Shell Output (PTY Master FDs - High Buffer Read) ---
         int needs_render = 0;
         for (int i = 0; i < MAX_SESSIONS; i++) {
             if (FD_ISSET(sessions[i].master_fd, &read_fds)) {
+                // 16KB பஃபர் முழுவதும் ஒரே முறையில் படிப்பதால் Tearing வராது:
                 nread = read(sessions[i].master_fd, buffer, sizeof(buffer));
                 if (nread > 0) {
                     for (int k = 0; k < nread; k++) {
