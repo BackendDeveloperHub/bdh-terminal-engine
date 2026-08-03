@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Optimized Clean Architecture)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (1920x1080 Optimized Clean Architecture)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -23,7 +23,7 @@
 #include "engine/input.h"
 #include "engine/renderer.h"
 #include "engine/terminal.h"
-#include "engine/session.h"    // Newly Modularized Session Manager
+#include "engine/session.h"
 
 static void fatal_signal_handler(int signo) {
     write(STDOUT_FILENO, "\033[?1049l", 8);
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
-    printf("\r\n[BDH Engine] Starting 100%% Pure CLI Mode (6-Tab Multiplexer + Full UI)...\r\n");
+    printf("\r\n[BDH Engine] Starting 1920x1080 Full HD Mode (6-Tab Multiplexer + Full UI)...\r\n");
 
     char *user_shell = getenv("SHELL");
     if (!user_shell || strlen(user_shell) == 0) {
@@ -70,8 +70,9 @@ int main(int argc, char *argv[]) {
         ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
     }
     
-    int scr_rows = (ws.ws_row > 0) ? ws.ws_row : 38;
-    int scr_cols = (ws.ws_col > 0) ? ws.ws_col : 135;
+    // --- 1920x1080 Full HD Display Layout ---
+    int scr_rows = (ws.ws_row > 0) ? ws.ws_row : 60;   
+    int scr_cols = (ws.ws_col > 0) ? ws.ws_col : 240;  
 
     int pty_rows = scr_rows - 2;
     int pty_cols = scr_cols - 2;
@@ -82,7 +83,7 @@ int main(int argc, char *argv[]) {
     int active_idx = 0;
 
     Clipboard *engine_cb = clipboard_create();
-    const char *default_cmd = "echo BDH CLI 6-Tab Multiplexer Active!\n";
+    const char *default_cmd = "echo BDH 1920x1080 Multiplexer Active!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
     TokenScanner *token_scanner = scanner_create();
