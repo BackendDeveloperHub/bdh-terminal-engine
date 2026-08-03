@@ -1,6 +1,6 @@
 main{
   
-call(gdb ./bdh-engine);
+call gdb ./bdh-engine;
 print("(gdb) run");
 
 
