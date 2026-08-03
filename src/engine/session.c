@@ -1,4 +1,4 @@
-// src/engine/session.c - BDH Terminal Session Management Implementation
+// src/engine/session.c - BDH Terminal Session Management Implementation (Signal 11 Fixed)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include "engine/session.h"
 #include "engine/pty.h"
+#include "ui/wm.h"            // <-- FIX: Signal 11 (Pointer Truncation) எரரைத் தடுக்க wm.h சேர்க்கப்பட்டுள்ளது!
 #include "ui/tabs.h"
 #include "ui/statusbar.h"
 #include "engine/scanner.h"
