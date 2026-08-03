@@ -1,4 +1,4 @@
-// src/engine/parser.c
+// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser
 #include "parser.h"
 #include <stdlib.h>
 
@@ -49,6 +49,10 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 clear_entire_window(win);
                 parser->state = STATE_NORMAL;
             }
+            // 2. Character Set Selection (\033( அல்லது \033)) & OSC Title Sequences - புறக்கணித்தல்:
+            else if (ch == '(' || ch == ')' || ch == ']' || ch == '=' || ch == '>') {
+                parser->state = STATE_NORMAL; // குப்பை எழுத்துக்கள் திரையில் வராது
+            }
             else {
                 parser->state = STATE_NORMAL;
                 if (ch != '\033') {
@@ -81,7 +85,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
 
                 int n = (parser->args[0] > 0) ? parser->args[0] : 1;
 
-                // --- ANSI Cursor & Screen Handlers ---
+                // --- ANSI VT100 Cursor & Screen Handlers ---
                 if (ch == 'A') { // Cursor Up
                     win->cur_r -= n;
                     if (win->cur_r < 0) win->cur_r = 0;
@@ -119,9 +123,8 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                         win->text[win->cur_r][c] = ' ';
                     }
                 }
-                // 2. CSI J (\033[J, \033[2J, \033[3J) - Clear Screen குறியீடுகள்:
+                // CSI J (\033[J, \033[2J, \033[3J) - Clear Screen குறியீடுகள்:
                 else if (ch == 'J') {
-                    // 2J அல்லது 3J அல்லது J எது வந்தாலும் முழு ஸ்கிரீனையும் சுத்தம் செய்ய:
                     clear_entire_window(win);
                 }
 
