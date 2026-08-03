@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Production-Ready + Full UI)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Ultimate 6-Tab Production Build)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,17 +12,18 @@
 #include "engine/pty.h"
 #include "engine/screen.h"
 #include "ui/panes.h"
-#include "ui/tabs.h"           // <-- NEW UI: Tab Bar
-#include "ui/statusbar.h"      // <-- NEW UI: Status Bar
+#include "ui/tabs.h"           // UI: Top Tab Bar
+#include "ui/statusbar.h"      // UI: Bottom Status Bar
 #include "engine/parser.h"
 #include "engine/clipboard.h"
-#include "engine/scanner.h"    // <-- Token Scanner Module
+#include "engine/scanner.h"    // Smart Token Scanner (Ctrl+K)
 #include "engine/cursor.h"
 #include "engine/input.h"
 #include "engine/renderer.h"
 #include "engine/terminal.h"
 
-#define MAX_SESSIONS 2
+// --- 6 Concurrent Bash Sessions ---
+#define MAX_SESSIONS 6
 
 typedef struct {
     int id;
@@ -47,17 +48,17 @@ static void setup_signal_handlers() {
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
 
-    sigaction(SIGSEGV, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT,  &sa, NULL);
-    sigaction(SIGABRT, &sa, NULL);
+    sigaction(SIGSEGV, &sa, NULL); // Signal 11 (Segfault Protection)
+    sigaction(SIGTERM, &sa, NULL); // Kill
+    sigaction(SIGINT,  &sa, NULL); // Ctrl + C
+    sigaction(SIGABRT, &sa, NULL); // Abort
 }
 
 int main(int argc, char *argv[]) {
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
-    printf("\r\n[BDH Engine] Starting 100%% Pure CLI Mode (With Full UI & Token Scanner)...\r\n");
+    printf("\r\n[BDH Engine] Starting 100%% Pure CLI Mode (6-Tab Multiplexer + Full UI)...\r\n");
 
     char *shell_argv[] = {"/bin/bash", NULL};
     terminal_enable_raw_mode();
@@ -82,32 +83,35 @@ int main(int argc, char *argv[]) {
     int active_idx = 0;
 
     Clipboard *engine_cb = clipboard_create();
-    const char *default_cmd = "echo BDH CLI Multiplexer Active!\n";
+    const char *default_cmd = "echo BDH CLI 6-Tab Multiplexer Active!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
     TokenScanner *token_scanner = scanner_create();
 
-    // --- NEW: UI Tab Bar & Status Bar உருவாக்கம் ---
+    // --- UI: Tab Bar & Status Bar உருவாக்கம் ---
     TabBar *tab_bar = tabs_create();
-    tabs_add(tab_bar, "PRIMARY BASH");
-    tabs_add(tab_bar, "SECONDARY BASH");
-
     StatusBar *status_bar = statusbar_create();
     statusbar_set_mode(status_bar, "NORMAL");
 
-    // --- Session 0 (Primary Window) ---
-    sessions[0].id = 0;
-    sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd, pty_rows, pty_cols);
-    sessions[0].win = window_create(0, 0, 0, scr_cols, scr_rows, "[ TAB 1/2 : PRIMARY BASH (ACTIVE) * ]", 1);
-    sessions[0].parser = parser_create();
-    sessions[0].is_alive = 1;
+    char *tab_names[MAX_SESSIONS] = {
+        "BASH-1", "BASH-2", "BASH-3", "BASH-4", "BASH-5", "BASH-6"
+    };
 
-    // --- Session 1 (Secondary Window) ---
-    sessions[1].id = 1;
-    sessions[1].pid = pty_spawn(shell_argv, &sessions[1].master_fd, pty_rows, pty_cols);
-    sessions[1].win = window_create(1, 0, 0, scr_cols, scr_rows, "[ TAB 2/2 : SECONDARY BASH ]", 0);
-    sessions[1].parser = parser_create();
-    sessions[1].is_alive = 1;
+    // --- 6 Sessions & Tabs Dynamic Loop Creation ---
+    for (int i = 0; i < MAX_SESSIONS; i++) {
+        sessions[i].id = i;
+        sessions[i].pid = pty_spawn(shell_argv, &sessions[i].master_fd, pty_rows, pty_cols);
+        
+        char win_title[64];
+        snprintf(win_title, sizeof(win_title), "[ TAB %d/%d : %s %s ]", 
+                 i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
+                 
+        sessions[i].win = window_create(i, 0, 0, scr_cols, scr_rows, win_title, (i == 0) ? 1 : 0);
+        sessions[i].parser = parser_create();
+        sessions[i].is_alive = 1;
+
+        tabs_add(tab_bar, tab_names[i]);
+    }
 
     // முதல் முறை விண்டோக்கள் + UI வரைதல்:
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -160,7 +164,7 @@ int main(int argc, char *argv[]) {
                         printf("\r\n[BDH Scanner] Scan cancelled.\r\n");
                     }
                     token_scanner->is_scanning_mode = 0;
-                    statusbar_set_mode(status_bar, "NORMAL"); // <-- UI Mode Restore
+                    statusbar_set_mode(status_bar, "NORMAL"); // UI Mode Restore
                     continue; // ஷெல்லுக்கு இந்த கீயை அனுப்பாமல் தடுக்கிறோம்
                 }
 
@@ -171,7 +175,7 @@ int main(int argc, char *argv[]) {
                     int count = scanner_scan_screen(token_scanner, scr);
                     if (count > 0) {
                         token_scanner->is_scanning_mode = 1;
-                        statusbar_set_mode(status_bar, "SCANNER"); // <-- UI Mode Switch to SCANNER!
+                        statusbar_set_mode(status_bar, "SCANNER"); // UI Mode Switch to SCANNER!
                         printf("\r\n\033[1;33m[BDH Scanner] Found %d tokens! Press 1-%d to copy, or any other key to cancel:\033[0m\r\n", count, count);
                         for (int t = 0; t < count; t++) {
                             printf("  \033[1;36m[%d]\033[0m %s\r\n", token_scanner->tokens[t].id, token_scanner->tokens[t].text);
@@ -190,25 +194,38 @@ int main(int argc, char *argv[]) {
                         engine_running = 0;
                         break;
 
-                    case INPUT_ACTION_SWITCH_WIN:
-                        sessions[active_idx].win->z_index = 0;
-                        sessions[active_idx].win->is_active = 0;
-                        strncpy(sessions[active_idx].win->title, 
-                                active_idx == 0 ? "[ TAB 1/2 : PRIMARY BASH ]" : "[ TAB 2/2 : SECONDARY BASH ]", 63);
+                    // --- 6-Session Safe Modulo Switching (Signal 11 Fix) ---
+                    case INPUT_ACTION_SWITCH_WIN: {
+                        if (sessions[active_idx].win) {
+                            sessions[active_idx].win->z_index = 0;
+                            sessions[active_idx].win->is_active = 0;
+                            snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s ]", 
+                                     active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+                        }
 
-                        active_idx = 1 - active_idx;
+                        // Round-Robin 0 to 5:
+                        int next_idx = (active_idx + 1) % MAX_SESSIONS;
+                        int attempts = 0;
+                        while (!sessions[next_idx].is_alive && attempts < MAX_SESSIONS) {
+                            next_idx = (next_idx + 1) % MAX_SESSIONS;
+                            attempts++;
+                        }
+                        active_idx = next_idx;
 
-                        sessions[active_idx].win->z_index = 1;
-                        sessions[active_idx].win->is_active = 1;
-                        strncpy(sessions[active_idx].win->title, 
-                                active_idx == 0 ? "[ TAB 1/2 : PRIMARY BASH (ACTIVE) * ]" : "[ TAB 2/2 : SECONDARY BASH (ACTIVE) * ]", 63);
+                        if (sessions[active_idx].win) {
+                            sessions[active_idx].win->z_index = 1;
+                            sessions[active_idx].win->is_active = 1;
+                            snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s (ACTIVE) * ]", 
+                                     active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+                        }
 
-                        tabs_set_active(tab_bar, active_idx); // <-- UI Tab Bar-லும் Active Tab-ஐ மாற்றுகிறோம்
+                        tabs_set_active(tab_bar, active_idx);
 
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         tabs_draw(scr, tab_bar, 0);
                         statusbar_draw(scr, status_bar, scr_rows - 1);
                         break;
+                    }
 
                     case INPUT_ACTION_OPEN_BROWSER: {
                         const char *target_url = getenv("BDH_URL");
@@ -269,9 +286,11 @@ int main(int argc, char *argv[]) {
                     
                     sessions[i].is_alive = 0;
                     close(sessions[i].master_fd);
-                    sessions[i].win->is_active = 0;
+                    if (sessions[i].win) {
+                        sessions[i].win->is_active = 0;
+                    }
                     
-                    char exit_msg[] = "\r\n[Session Exited - Press Ctrl+B to switch or exit engine]\r\n";
+                    char exit_msg[] = "\r\n[Session Exited - Switch tab to continue]\r\n";
                     for (size_t k = 0; k < strlen(exit_msg); k++) {
                         parser_feed_char(sessions[i].parser, scr, sessions[i].win, exit_msg[k]);
                     }
@@ -303,8 +322,8 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    tabs_destroy(tab_bar);          // <-- UI Memory Cleanup
-    statusbar_destroy(status_bar);  // <-- UI Memory Cleanup
+    tabs_destroy(tab_bar);          // UI Memory Cleanup
+    statusbar_destroy(status_bar);  // UI Memory Cleanup
     scanner_destroy(token_scanner);
     clipboard_destroy(engine_cb);
     screen_destroy(scr);
