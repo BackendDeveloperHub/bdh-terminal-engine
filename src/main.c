@@ -5,6 +5,7 @@
 #include <sys/select.h>
 #include <sys/ioctl.h>
 #include <string.h>
+#include <sys/time.h>
 #include "engine/pty.h"
 #include "engine/screen.h"
 #include "ui/panes.h"
@@ -14,7 +15,7 @@
 #include "engine/input.h"
 #include "engine/renderer.h"
 #include "engine/terminal.h"
-#include "engine/browser.h" // <-- 1. Browser Header சேர்க்கப்பட்டுள்ளது!
+#include "engine/browser.h" // <-- Browser Header
 
 #define MAX_SESSIONS 2
 
@@ -26,7 +27,10 @@ typedef struct {
     AnsiParser *parser;
 } TerminalSession;
 
-int main() {
+int main(int argc, char *argv[]) {
+    // 1. GTK Engine-ஐ ஆரம்பத்திலேயே Initialize செய்ய வேண்டும் (Crash Fix #1)
+    gtk_init(&argc, &argv);
+
     char *shell_argv[] = {"/bin/bash", NULL};
     
     // Terminal Module மூலம் Raw Mode ஆன் செய்யப்படுகிறது:
@@ -55,7 +59,7 @@ int main() {
     int active_idx = 0;
 
     // --- Browser UI Tracker ---
-    BrowserWindow *my_browser = NULL; // <-- 2. பிரவுசருக்கான Pointer
+    BrowserWindow *my_browser = NULL; // <-- பிரவுசருக்கான Pointer
 
     // --- Engine Clipboard ---
     Clipboard *engine_cb = clipboard_create();
@@ -66,7 +70,6 @@ int main() {
     // --- Session 0 (Primary Window) ---
     sessions[0].id = 0;
     sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd, pty_rows, pty_cols);
-    // இடது மேல் மூலையில் தெளிவாகத் தெரியும்படி புதிய Tab டைட்டில்:
     sessions[0].win = window_create(0, 0, 0, scr_cols, scr_rows, "[ TAB 1/2 : PRIMARY BASH (ACTIVE) * ]", 1);
     sessions[0].parser = parser_create();
 
@@ -86,6 +89,11 @@ int main() {
     int engine_running = 1;
 
     while (engine_running) {
+        // --- 2. GTK & WebKit Events-ஐ தடையின்றி இயங்க வைக்க (Crash Fix #2) ---
+        while (gtk_events_pending()) {
+            gtk_main_iteration();
+        }
+
         FD_ZERO(&read_fds);
         FD_SET(STDIN_FILENO, &read_fds);
         max_fd = STDIN_FILENO;
@@ -97,7 +105,9 @@ int main() {
             }
         }
 
-        if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) == -1) break;
+        // --- 3. 10ms Timeout கொடுப்பதால் GTK-வும் டெர்மினலும் பிளாக் ஆகாமல் இயங்கும் (Crash Fix #3) ---
+        struct timeval tv = {0, 10000}; // 10ms
+        if (select(max_fd + 1, &read_fds, NULL, NULL, &tv) == -1) break;
 
         // --- 1. Keyboard Input -> Input Module ---
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
@@ -128,15 +138,19 @@ int main() {
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         break;
 
-                    // --- 3. புதிய Browser Integration Handling ---
+                    // --- Safe Browser Integration Handling ---
                     case INPUT_ACTION_OPEN_BROWSER:
                         if (my_browser == NULL) {
                             my_browser = browser_create("BDH GUI Browser", 1200, 800);
-                            browser_load_url(my_browser, "https://github.com/BackendDeveloperHub");
-                            gtk_widget_show_all(my_browser->window);
+                            if (my_browser != NULL && my_browser->window != NULL) {
+                                browser_load_url(my_browser, "https://github.com/BackendDeveloperHub");
+                                gtk_widget_show_all(my_browser->window);
+                            }
                         } else {
                             // ஏற்கனவே பிரவுசர் திறந்திருந்தால் அதை முன்னால் கொண்டு வருதல் (Focus)
-                            gtk_window_present(GTK_WINDOW(my_browser->window));
+                            if (my_browser->window != NULL) {
+                                gtk_window_present(GTK_WINDOW(my_browser->window));
+                            }
                         }
                         break;
 
@@ -185,7 +199,7 @@ int main() {
         close(sessions[i].master_fd);
     }
     
-    // 4. பிரவுசர் மெமரியை சுத்தம் செய்தல்:
+    // பிரவுசர் மெமரியை சுத்தம் செய்தல்:
     if (my_browser != NULL) {
         browser_destroy(my_browser);
     }
