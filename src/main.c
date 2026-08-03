@@ -15,7 +15,6 @@
 #include "engine/input.h"
 #include "engine/renderer.h"
 #include "engine/terminal.h"
-#include "engine/browser.h" // <-- Browser Header
 
 #define MAX_SESSIONS 2
 
@@ -28,11 +27,7 @@ typedef struct {
 } TerminalSession;
 
 int main(int argc, char *argv[]) {
-    // 1. Display இருக்கிறதா எனப் பார்க்கிறோம்; இல்லாவிட்டாலும் என்ஜின் கிராஷ் ஆகாது! (Smart GUI Check)
-    int gui_available = gtk_init_check(&argc, &argv);
-    if (!gui_available) {
-        printf("\r\n[BDH Engine] Notice: No GUI Display detected. Running in CLI Terminal Mode.\r\n");
-    }
+    printf("\r\n[BDH Engine] Starting in 100%% Pure CLI Mode (Terminal Browser Enabled)...\r\n");
 
     char *shell_argv[] = {"/bin/bash", NULL};
     
@@ -52,7 +47,6 @@ int main(int argc, char *argv[]) {
     int pty_rows = scr_rows - 2;
     int pty_cols = scr_cols - 2;
 
-    // ஸ்கிரீன் சைஸ் என்ன கண்டுபிடிக்கப்பட்டது என்பதைத் தெரிந்துகொள்ள Debug Print:
     printf("\r\n[BDH Engine] Detected Screen Size: %d cols x %d rows (PTY Inner: %d x %d)\r\n", 
            scr_cols, scr_rows, pty_cols, pty_rows);
 
@@ -61,15 +55,12 @@ int main(int argc, char *argv[]) {
     TerminalSession sessions[MAX_SESSIONS];
     int active_idx = 0;
 
-    // --- Browser UI Tracker ---
-    BrowserWindow *my_browser = NULL;
-
     // --- Engine Clipboard ---
     Clipboard *engine_cb = clipboard_create();
     const char *default_cmd = "echo BDH Clipboard Success!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
-    // 4. எல்லா டேப்களையும் முழு ஸ்கிரீன் அளவில் (x=0, y=0, scr_cols, scr_rows) உருவாக்குதல்!
+    // 4. எல்லா டேப்களையும் முழு ஸ்கிரீன் அளவில் உருவாக்குதல்!
     // --- Session 0 (Primary Window) ---
     sessions[0].id = 0;
     sessions[0].pid = pty_spawn(shell_argv, &sessions[0].master_fd, pty_rows, pty_cols);
@@ -92,13 +83,6 @@ int main(int argc, char *argv[]) {
     int engine_running = 1;
 
     while (engine_running) {
-        // --- 2. GUI Display இருந்தால் மட்டுமே GTK & WebKit Events இயங்கும் ---
-        if (gui_available) {
-            while (gtk_events_pending()) {
-                gtk_main_iteration();
-            }
-        }
-
         FD_ZERO(&read_fds);
         FD_SET(STDIN_FILENO, &read_fds);
         max_fd = STDIN_FILENO;
@@ -110,8 +94,8 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // --- 3. 10ms Timeout கொடுப்பதால் GTK-வும் டெர்மினலும் பிளாக் ஆகாமல் இயங்கும் ---
-        struct timeval tv = {0, 10000}; // 10ms
+        // 10ms Timeout:
+        struct timeval tv = {0, 10000}; 
         if (select(max_fd + 1, &read_fds, NULL, NULL, &tv) == -1) break;
 
         // --- 1. Keyboard Input -> Input Module ---
@@ -126,7 +110,6 @@ int main(int argc, char *argv[]) {
                         break;
 
                     case INPUT_ACTION_SWITCH_WIN:
-                        // பழைய Active விண்டோவை Inactive ஆக மாற்றுகிறோம்:
                         sessions[active_idx].win->z_index = 0;
                         sessions[active_idx].win->is_active = 0;
                         strncpy(sessions[active_idx].win->title, 
@@ -134,7 +117,6 @@ int main(int argc, char *argv[]) {
 
                         active_idx = 1 - active_idx;
 
-                        // புதிய விண்டோவை Active ஆக மாற்றுகிறோம்:
                         sessions[active_idx].win->z_index = 1;
                         sessions[active_idx].win->is_active = 1;
                         strncpy(sessions[active_idx].win->title, 
@@ -143,22 +125,13 @@ int main(int argc, char *argv[]) {
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         break;
 
-                    // --- Safe Browser Integration Handling ---
-                    case INPUT_ACTION_OPEN_BROWSER:
-                        if (gui_available) {
-                            if (my_browser == NULL) {
-                                my_browser = browser_create("BDH GUI Browser", 1200, 800);
-                                if (my_browser != NULL && my_browser->window != NULL) {
-                                    browser_load_url(my_browser, "https://github.com/BackendDeveloperHub");
-                                    gtk_widget_show_all(my_browser->window);
-                                }
-                            } else {
-                                if (my_browser->window != NULL) {
-                                    gtk_window_present(GTK_WINDOW(my_browser->window));
-                                }
-                            }
-                        }
+                    // --- 100% CLI Browser Integration ---
+                    case INPUT_ACTION_OPEN_BROWSER: {
+                        // GUI தேவையில்லை! Active Bash டேப்பிற்குள்ளேயே w3m டெர்மினல் பிரவுசரை ஓப்பன் செய்கிறோம்:
+                        const char *browser_cmd = "w3m https://github.com/BackendDeveloperHub\n";
+                        write(sessions[active_idx].master_fd, browser_cmd, strlen(browser_cmd));
                         break;
+                    }
 
                     case INPUT_ACTION_PASTE: {
                         const char *paste_data = clipboard_get(engine_cb);
@@ -203,11 +176,6 @@ int main(int argc, char *argv[]) {
         parser_destroy(sessions[i].parser);
         window_destroy(sessions[i].win);
         close(sessions[i].master_fd);
-    }
-    
-    // பிரவுசர் மெமரியை சுத்தம் செய்தல்:
-    if (my_browser != NULL) {
-        browser_destroy(my_browser);
     }
     
     clipboard_destroy(engine_cb);
