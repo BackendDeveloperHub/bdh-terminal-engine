@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Ultimate 6-Tab Stable Build)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Ultimate 6-Tab Crash-Free Build)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -35,7 +35,7 @@ typedef struct {
 } TerminalSession;
 
 static void fatal_signal_handler(int signo) {
-    // --- FIX 1: கிராஷ் ஆனாலும் Alternate Screen-ல் இருந்து நார்மல் ஸ்கிரீனுக்கு திரும்புதல் ---
+    // கிராஷ் ஆனாலும் Alternate Screen-ல் இருந்து நார்மல் ஸ்கிரீனுக்கு பாதுகாப்பாகத் திரும்புதல்:
     write(STDOUT_FILENO, "\033[?1049l", 8);
     terminal_disable_raw_mode();
     
@@ -63,10 +63,16 @@ int main(int argc, char *argv[]) {
 
     printf("\r\n[BDH Engine] Starting 100%% Pure CLI Mode (6-Tab Multiplexer + Full UI)...\r\n");
 
-    char *shell_argv[] = {"/bin/bash", NULL};
+    // --- FIX 1: Termux & Linux Shell Path-ஐ பாதுகாப்பாக எடுத்தல் ---
+    char *user_shell = getenv("SHELL");
+    if (!user_shell || strlen(user_shell) == 0) {
+        user_shell = "/bin/bash";
+    }
+    char *shell_argv[] = {user_shell, NULL};
+
     terminal_enable_raw_mode();
 
-    // --- FIX 1: Alternate Screen Buffer-ஐ ஆன் செய்கிறோம் (tmux/vim style) ---
+    // Alternate Screen Buffer-ஐ ஆன் செய்கிறோம்:
     write(STDOUT_FILENO, "\033[?1049h\033[H", 11);
 
     struct winsize ws = {0};
@@ -77,7 +83,6 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 0) ? ws.ws_row : 38;
     int scr_cols = (ws.ws_col > 0) ? ws.ws_col : 135;
 
-    // மேலே Tab Bar (1 வரி) மற்றும் கீழே Status Bar (1 வரி) போக உள்ளே PTY அளவு:
     int pty_rows = scr_rows - 2;
     int pty_cols = scr_cols - 2;
 
@@ -91,7 +96,6 @@ int main(int argc, char *argv[]) {
 
     TokenScanner *token_scanner = scanner_create();
 
-    // --- UI: Tab Bar & Status Bar உருவாக்கம் ---
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
     statusbar_set_mode(status_bar, "NORMAL");
@@ -100,16 +104,23 @@ int main(int argc, char *argv[]) {
         "BASH-1", "BASH-2", "BASH-3", "BASH-4", "BASH-5", "BASH-6"
     };
 
-    // --- 6 Sessions & Tabs Dynamic Loop Creation ---
+    // --- 6 Sessions & Tabs Safe Loop Creation ---
     for (int i = 0; i < MAX_SESSIONS; i++) {
         sessions[i].id = i;
         sessions[i].pid = pty_spawn(shell_argv, &sessions[i].master_fd, pty_rows, pty_cols);
         
+        // --- FIX 2: PTY ஃபெயில் ஆனால் கிராஷ் ஆகாமல் பாதுகாக்கும் அரண் ---
+        if (sessions[i].pid < 0 || sessions[i].master_fd < 0) {
+            sessions[i].is_alive = 0;
+            sessions[i].win = NULL;
+            sessions[i].parser = NULL;
+            continue;
+        }
+
         char win_title[64];
         snprintf(win_title, sizeof(win_title), "[ TAB %d/%d : %s %s ]", 
                  i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
                  
-        // y=1 மற்றும் height=scr_rows-2 என அமைக்கப்பட்ட Window Layout:
         sessions[i].win = window_create(i, 0, 1, scr_cols, scr_rows - 2, win_title, (i == 0) ? 1 : 0);
         sessions[i].parser = parser_create();
         sessions[i].is_alive = 1;
@@ -133,8 +144,9 @@ int main(int argc, char *argv[]) {
         FD_SET(STDIN_FILENO, &read_fds);
         max_fd = STDIN_FILENO;
 
+        // --- FIX 3: FD_SET(-1) Segfault எரரைத் தடுக்கும் பாதுகாப்பான லூப் ---
         for (int i = 0; i < MAX_SESSIONS; i++) {
-            if (sessions[i].is_alive) {
+            if (sessions[i].is_alive && sessions[i].master_fd >= 0) {
                 FD_SET(sessions[i].master_fd, &read_fds);
                 if (sessions[i].master_fd > max_fd) {
                     max_fd = sessions[i].master_fd;
@@ -153,9 +165,6 @@ int main(int argc, char *argv[]) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer));
             if (nread > 0) {
                 
-                // =========================================================
-                // --- NEW FEATURE 1: Scanning Mode Active (Number Copy) ---
-                // =========================================================
                 if (token_scanner->is_scanning_mode) {
                     if (buffer[0] >= '1' && buffer[0] <= '9') {
                         int token_id = buffer[0] - '0';
@@ -168,18 +177,15 @@ int main(int argc, char *argv[]) {
                         printf("\r\n[BDH Scanner] Scan cancelled.\r\n");
                     }
                     token_scanner->is_scanning_mode = 0;
-                    statusbar_set_mode(status_bar, "NORMAL"); // UI Mode Restore
-                    continue; // ஷெல்லுக்கு இந்த கீயை அனுப்பாமல் தடுக்கிறோம்
+                    statusbar_set_mode(status_bar, "NORMAL");
+                    continue;
                 }
 
-                // =========================================================
-                // --- NEW FEATURE 2: Trigger Token Scanner (Ctrl + K) ---
-                // =========================================================
-                if (buffer[0] == 11) { // Ctrl + K in ASCII is 11 (0x0B)
+                if (buffer[0] == 11) { // Ctrl + K (Token Scanner)
                     int count = scanner_scan_screen(token_scanner, scr);
                     if (count > 0) {
                         token_scanner->is_scanning_mode = 1;
-                        statusbar_set_mode(status_bar, "SCANNER"); // UI Mode Switch to SCANNER!
+                        statusbar_set_mode(status_bar, "SCANNER");
                         printf("\r\n\033[1;33m[BDH Scanner] Found %d tokens! Press 1-%d to copy, or any other key to cancel:\033[0m\r\n", count, count);
                         for (int t = 0; t < count; t++) {
                             printf("  \033[1;36m[%d]\033[0m %s\r\n", token_scanner->tokens[t].id, token_scanner->tokens[t].text);
@@ -190,7 +196,6 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // --- Normal Keyboard Input Logic ---
                 InputAction action = input_parse_key(buffer[0], engine_cb, "ls -la /home\n");
 
                 switch (action) {
@@ -198,7 +203,7 @@ int main(int argc, char *argv[]) {
                         engine_running = 0;
                         break;
 
-                    // --- 6-Session Safe Modulo Switching (Signal 11 Fix) ---
+                    // --- 6-Session Safe Modulo Switching ---
                     case INPUT_ACTION_SWITCH_WIN: {
                         if (sessions[active_idx].win) {
                             sessions[active_idx].win->z_index = 0;
@@ -207,7 +212,6 @@ int main(int argc, char *argv[]) {
                                      active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
                         }
 
-                        // Round-Robin 0 to 5:
                         int next_idx = (active_idx + 1) % MAX_SESSIONS;
                         int attempts = 0;
                         while (!sessions[next_idx].is_alive && attempts < MAX_SESSIONS) {
@@ -240,7 +244,7 @@ int main(int argc, char *argv[]) {
                         char browser_cmd[512];
                         snprintf(browser_cmd, sizeof(browser_cmd), "links %s\n", target_url);
                         
-                        if (sessions[active_idx].is_alive) {
+                        if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
                             write(sessions[active_idx].master_fd, browser_cmd, strlen(browser_cmd));
                         }
                         break;
@@ -248,7 +252,7 @@ int main(int argc, char *argv[]) {
 
                     case INPUT_ACTION_PASTE: {
                         const char *paste_data = clipboard_get(engine_cb);
-                        if (strlen(paste_data) > 0 && sessions[active_idx].is_alive) {
+                        if (strlen(paste_data) > 0 && sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
                             write(sessions[active_idx].master_fd, paste_data, strlen(paste_data));
                         }
                         break;
@@ -259,7 +263,7 @@ int main(int argc, char *argv[]) {
 
                     case INPUT_ACTION_NORMAL:
                     default:
-                        if (sessions[active_idx].is_alive) {
+                        if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
                             write(sessions[active_idx].master_fd, buffer, nread);
                         }
                         break;
@@ -267,20 +271,20 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // --- 2. Shell Output & Zombie Prevention ---
+        // --- 2. Shell Output & Safe Background Filtering ---
         int needs_render = 0;
         int active_sessions_count = 0;
 
         for (int i = 0; i < MAX_SESSIONS; i++) {
-            if (!sessions[i].is_alive) continue;
+            if (!sessions[i].is_alive || sessions[i].master_fd < 0) continue;
             active_sessions_count++;
 
             if (FD_ISSET(sessions[i].master_fd, &read_fds)) {
                 nread = read(sessions[i].master_fd, buffer, sizeof(buffer));
                 
                 if (nread > 0) {
-                    // --- FIX 2 (SEGFAULT PROTECTION): தற்போதைய Active Tab-ன் அவுட்புட்டை மட்டுமே ஸ்கிரீனுக்கு அனுப்புகிறோம்! ---
-                    if (i == active_idx && sessions[i].win && sessions[i].win->is_active) {
+                    // தற்போதைய Active Tab-ன் அவுட்புட்டை மட்டுமே ஸ்கிரீனுக்கு அனுப்புகிறோம்:
+                    if (i == active_idx && sessions[i].win && sessions[i].win->is_active && sessions[i].parser) {
                         for (int k = 0; k < nread; k++) {
                             parser_feed_char(sessions[i].parser, scr, sessions[i].win, buffer[k]);
                         }
@@ -293,11 +297,12 @@ int main(int argc, char *argv[]) {
                     
                     sessions[i].is_alive = 0;
                     close(sessions[i].master_fd);
+                    sessions[i].master_fd = -1;
                     if (sessions[i].win) {
                         sessions[i].win->is_active = 0;
                     }
                     
-                    if (i == active_idx) {
+                    if (i == active_idx && sessions[i].parser && sessions[i].win) {
                         char exit_msg[] = "\r\n[Session Exited - Switch tab to continue]\r\n";
                         for (size_t k = 0; k < strlen(exit_msg); k++) {
                             parser_feed_char(sessions[i].parser, scr, sessions[i].win, exit_msg[k]);
@@ -314,36 +319,32 @@ int main(int argc, char *argv[]) {
 
         // --- UI Rendering Block ---
         if (needs_render) {
-            // VT100 Auto Line-Wrap Disable (ஸ்க்ரோல் ஆவதை முழுமையாகத் தடுக்க):
-            write(STDOUT_FILENO, "\033[?7l", 5);
+            write(STDOUT_FILENO, "\033[?7l", 5); // Disable Auto Line-Wrap
 
             renderer_draw_all(scr, sessions, MAX_SESSIONS);
-            
-            // மேலே Top Tab Bar (Row 0) மற்றும் கீழே Bottom Status Bar (Last Row) வரைதல்:
             tabs_draw(scr, tab_bar, 0);
             statusbar_draw(scr, status_bar, scr_rows - 1);
 
-            // மீண்டும் Auto Line-Wrap Enable:
-            write(STDOUT_FILENO, "\033[?7h", 5);
+            write(STDOUT_FILENO, "\033[?7h", 5); // Enable Auto Line-Wrap
         }
     }
 
     // --- Clean Memory & Deallocation ---
     for (int i = 0; i < MAX_SESSIONS; i++) {
-        parser_destroy(sessions[i].parser);
-        window_destroy(sessions[i].win);
-        if (sessions[i].is_alive) {
+        if (sessions[i].parser) parser_destroy(sessions[i].parser);
+        if (sessions[i].win) window_destroy(sessions[i].win);
+        if (sessions[i].is_alive && sessions[i].master_fd >= 0) {
             close(sessions[i].master_fd);
         }
     }
     
-    tabs_destroy(tab_bar);          // UI Memory Cleanup
-    statusbar_destroy(status_bar);  // UI Memory Cleanup
+    tabs_destroy(tab_bar);
+    statusbar_destroy(status_bar);
     scanner_destroy(token_scanner);
     clipboard_destroy(engine_cb);
     screen_destroy(scr);
 
-    // --- FIX 1: நார்மல் டெர்மினல் ஸ்கிரீனுக்கு திரும்புதல் ---
+    // Alternate Screen-ல் இருந்து நார்மல் டெர்மினல் திரைக்குத் திரும்புதல்:
     write(STDOUT_FILENO, "\033[?1049l", 8);
 
     printf("\r\nBDH Pure Linux CLI Multiplexer Exited Cleanly.\r\n");
