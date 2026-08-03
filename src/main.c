@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Ctrl+A Safe)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Zero-Warning Clean Safe)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -150,15 +150,13 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch - 100% Signal 11 Safe) ---
+                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch - Clean Array Safe) ---
                 if (buffer[0] == 1) { 
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 0;
                         sessions[active_idx].win->is_active = 0;
-                        if (sessions[active_idx].win->title) {
-                            snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s ]", 
-                                     active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
-                        }
+                        snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), 
+                                 "[ TAB %d/%d : %s ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
                     }
 
                     int next_idx = (active_idx + 1) % MAX_SESSIONS;
@@ -172,10 +170,8 @@ int main(int argc, char *argv[]) {
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 1;
                         sessions[active_idx].win->is_active = 1;
-                        if (sessions[active_idx].win->title) {
-                            snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s (ACTIVE) * ]", 
-                                     active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
-                        }
+                        snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), 
+                                 "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
                     }
 
                     if (tab_bar) tabs_set_active(tab_bar, active_idx);
