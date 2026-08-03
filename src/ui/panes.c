@@ -1,4 +1,4 @@
-// src/ui/panes.c
+// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (100% Updated & Complete)
 #include "panes.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,22 +84,26 @@ void window_draw(VirtualScreen *scr, FloatingWindow *win) {
 
     // 3. விண்டோ தலைப்பு (Title Bar) - இடது மேல் மூலையில் (Top-Left Corner) தெளிவாகக் காட்டுதல்!
     int title_len = strlen(win->title);
-    int title_pos = start_c + 3; // <-- Center-க்கு பதிலாக இடதுபக்கம் 3-வது இடத்திலிருந்து தொடங்கும்!
+    int title_pos = start_c + 3; // இடதுபக்கம் 3-வது இடத்திலிருந்து தொடங்கும்
     
     for (int i = 0; i < title_len && (title_pos + i) < end_c; i++) {
         screen_put_char(scr, start_r, title_pos + i, win->title[i]);
     }
 }
 
-// 2. மாற்றியமைக்கப்பட்ட window_put_char (Scrolling + Backspace ஆதரவுடன்)
+// 2. முழுமையான window_put_char (Scrolling + Backspace + Tab '\t' ஆதரவுடன்)
 void window_put_char(VirtualScreen *scr, FloatingWindow *win, char ch) {
+    (void)scr; // scr நேரடியாகத் தேவையில்லை எனில் compiler warning-ஐத் தவிர்க்க
     int inner_width = win->width - 2;
     int inner_height = win->height - 2;
 
+    // Carriage Return (\r - ASCII 13)
     if (ch == '\r') {
         win->cur_c = 0;
         return;
     }
+    
+    // Newline / Line Feed (\n - ASCII 10)
     if (ch == '\n') {
         win->cur_r++;
         if (win->cur_r >= inner_height) {
@@ -109,7 +113,27 @@ void window_put_char(VirtualScreen *scr, FloatingWindow *win, char ch) {
         return;
     }
 
-    // Backspace ஆதரவு
+    // --- ADDED: Tab (\t - ASCII 9) ஆதரவு ('ls' கமாண்டுக்கு மிக முக்கியம்!) ---
+    if (ch == '\t') {
+        int next_tab = (win->cur_c + 8) & ~7; // 8-Space Tab Stop
+        while (win->cur_c < next_tab && win->cur_c < inner_width) {
+            if (win->cur_r < WIN_MAX_ROWS && win->cur_c < WIN_MAX_COLS) {
+                win->text[win->cur_r][win->cur_c] = ' ';
+            }
+            win->cur_c++;
+        }
+        if (win->cur_c >= inner_width) {
+            win->cur_c = 0;
+            win->cur_r++;
+            if (win->cur_r >= inner_height) {
+                window_scroll_up(win);
+                win->cur_r = inner_height - 1;
+            }
+        }
+        return;
+    }
+
+    // Backspace ஆதரவு (\b அல்லது 127)
     if (ch == '\b' || ch == 127) {
         if (win->cur_c > 0) {
             win->cur_c--;
@@ -120,12 +144,14 @@ void window_put_char(VirtualScreen *scr, FloatingWindow *win, char ch) {
         return;
     }
 
+    // சாதாரண எழுத்துக்கள் (Printable ASCII 32..126)
     if (ch >= 32 && ch <= 126) {
         if (win->cur_r < WIN_MAX_ROWS && win->cur_c < WIN_MAX_COLS) {
             win->text[win->cur_r][win->cur_c] = ch;
         }
 
         win->cur_c++;
+        // Auto-wrap (வரியின் முடிவை அடைந்தால் அடுத்த வரிக்குச் செல்ல)
         if (win->cur_c >= inner_width) {
             win->cur_c = 0;
             win->cur_r++;
