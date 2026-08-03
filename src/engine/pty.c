@@ -1,4 +1,4 @@
-// src/engine/pty.c
+// src/engine/pty.c - BDH Pure Linux CLI Multiplexer PTY Engine (100% Complete)
 #define _XOPEN_SOURCE 600
 #include "pty.h"
 #include <stdio.h>
@@ -63,4 +63,20 @@ pid_t pty_spawn(char *const argv[], int *master_fd, int rows, int cols) {
     }
 
     return -1;
+}
+
+// --- ADDED: லே-அவுட் அளவு மாறும்போது PTY-க்கு புதிய அளவைத் தெரிவிக்கும் ஃபங்ஷன் ---
+int pty_resize(int master_fd, int rows, int cols) {
+    struct winsize ws = {
+        .ws_row = rows,
+        .ws_col = cols,
+        .ws_xpixel = 0,
+        .ws_ypixel = 0
+    };
+    
+    if (ioctl(master_fd, TIOCSWINSZ, &ws) == -1) {
+        perror("[Error] TIOCSWINSZ failed");
+        return -1;
+    }
+    return 0;
 }
