@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (100% Robust 6-Tab Production Build)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Optimized Clean Architecture)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -9,34 +9,24 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <errno.h>
+
 #include "engine/pty.h"
 #include "engine/screen.h"
 #include "ui/panes.h"
-#include "ui/wm.h"             // UI: Window Manager Module
-#include "ui/tabs.h"           // UI: Top Tab Bar Module
-#include "ui/statusbar.h"      // UI: Bottom Status Bar Module
+#include "ui/wm.h"
+#include "ui/tabs.h"
+#include "ui/statusbar.h"
 #include "engine/parser.h"
 #include "engine/clipboard.h"
-#include "engine/scanner.h"    // Smart Token Scanner (Ctrl+K)
+#include "engine/scanner.h"
 #include "engine/cursor.h"
 #include "engine/input.h"
 #include "engine/renderer.h"
 #include "engine/terminal.h"
-
-// --- 6 Concurrent Bash Sessions ---
-#define MAX_SESSIONS 6
-
-typedef struct {
-    int id;
-    int master_fd;
-    pid_t pid;
-    FloatingWindow *win;
-    AnsiParser *parser;
-    int is_alive;
-} TerminalSession;
+#include "engine/session.h"    // Newly Modularized Session Manager
 
 static void fatal_signal_handler(int signo) {
-    write(STDOUT_FILENO, "\033[?1049l", 8); // Restore Normal Terminal
+    write(STDOUT_FILENO, "\033[?1049l", 8);
     terminal_disable_raw_mode();
     
     char msg[128];
@@ -51,10 +41,10 @@ static void setup_signal_handlers() {
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
 
-    sigaction(SIGSEGV, &sa, NULL); // Signal 11 (Segfault Protection)
-    sigaction(SIGTERM, &sa, NULL); // Kill
-    sigaction(SIGINT,  &sa, NULL); // Ctrl + C
-    sigaction(SIGABRT, &sa, NULL); // Abort
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT,  &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
 }
 
 int main(int argc, char *argv[]) {
@@ -73,8 +63,6 @@ int main(int argc, char *argv[]) {
     char *shell_argv[] = {user_shell, NULL};
 
     terminal_enable_raw_mode();
-
-    // Alternate Screen Buffer-ஐ ஆன் செய்கிறோம் (tmux/vim style):
     write(STDOUT_FILENO, "\033[?1049h\033[H", 11);
 
     struct winsize ws = {0};
@@ -91,8 +79,6 @@ int main(int argc, char *argv[]) {
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
     
     TerminalSession sessions[MAX_SESSIONS];
-    memset(sessions, 0, sizeof(sessions)); // Stack Memory Garbage Clearing
-    
     int active_idx = 0;
 
     Clipboard *engine_cb = clipboard_create();
@@ -100,9 +86,9 @@ int main(int argc, char *argv[]) {
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
     TokenScanner *token_scanner = scanner_create();
-
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
+    
     statusbar_set_mode(status_bar, "NORMAL");
     statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
 
@@ -110,43 +96,15 @@ int main(int argc, char *argv[]) {
         "BASH-1", "BASH-2", "BASH-3", "BASH-4", "BASH-5", "BASH-6"
     };
 
-    // --- 6 Sessions & Tabs Safe Creation (100% Robust Loop with Fallback) ---
-    for (int i = 0; i < MAX_SESSIONS; i++) {
-        sessions[i].id = i;
-        sessions[i].master_fd = -1;
-        sessions[i].is_alive = 0;
-        sessions[i].win = NULL;
-        sessions[i].parser = NULL;
-
-        sessions[i].pid = pty_spawn(shell_argv, &sessions[i].master_fd, pty_rows, pty_cols);
-        
-        if (sessions[i].pid < 0 || sessions[i].master_fd < 0) {
-            // Fallback to standard bash if custom shell path fails
-            sessions[i].pid = pty_spawn((char *[]){"/bin/bash", NULL}, &sessions[i].master_fd, pty_rows, pty_cols);
-            if (sessions[i].pid < 0 || sessions[i].master_fd < 0) {
-                continue; 
-            }
-        }
-
-        char win_title[64];
-        snprintf(win_title, sizeof(win_title), "[ TAB %d/%d : %s %s ]", 
-                 i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
-                 
-        sessions[i].win = window_create(i, 0, 1, scr_cols, scr_rows - 2, win_title, (i == 0) ? 1 : 0);
-        sessions[i].parser = parser_create();
-        
-        if (sessions[i].win != NULL && sessions[i].parser != NULL) {
-            sessions[i].is_alive = 1;
-            tabs_add(tab_bar, tab_names[i]);
-        }
-    }
+    // --- Modularized Session & Tab Initialization ---
+    sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
     if (tab_bar) tabs_draw(scr, tab_bar, 0);
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
 
     fd_set read_fds;
-    char buffer[16384]; // 16 KB Anti-Glitch Buffer
+    char buffer[16384];
     ssize_t nread;
     int max_fd = 0;
     int engine_running = 1;
@@ -165,7 +123,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        struct timeval tv = {0, 10000}; // 10ms
+        struct timeval tv = {0, 10000};
         if (select(max_fd + 1, &read_fds, NULL, NULL, &tv) == -1) {
             if (errno == EINTR) continue;
             break;
@@ -192,9 +150,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // =================================================================
-                // --- SAFE INTERCEPTOR 1: Ctrl+A (ASCII 1) -> TAB SWITCH ---
-                // =================================================================
+                // --- Interceptor 1: Ctrl+A (Tab Switch) ---
                 if (buffer[0] == 1) { 
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 0;
@@ -228,9 +184,7 @@ int main(int argc, char *argv[]) {
                     continue; 
                 }
 
-                // =================================================================
-                // --- SAFE INTERCEPTOR 2: Ctrl+B (ASCII 2) -> OPEN BROWSER ---
-                // =================================================================
+                // --- Interceptor 2: Ctrl+B (Browser) ---
                 if (buffer[0] == 2) {
                     const char *target_url = getenv("BDH_URL");
                     if (!target_url || strlen(target_url) == 0) {
@@ -246,9 +200,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // =================================================================
-                // --- SAFE INTERCEPTOR 3: Ctrl+K (ASCII 11) -> TOKEN SCANNER ---
-                // =================================================================
+                // --- Interceptor 3: Ctrl+K (Token Scanner) ---
                 if (buffer[0] == 11) { 
                     int count = scanner_scan_screen(token_scanner, scr);
                     if (count > 0) {
@@ -264,7 +216,6 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // --- Normal Keyboard Input ---
                 InputAction action = input_parse_key(buffer[0], engine_cb, "ls -la /home\n");
 
                 switch (action) {
@@ -335,7 +286,6 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        // --- UI Rendering Block ---
         if (needs_render) {
             write(STDOUT_FILENO, "\033[?7l", 5); 
             renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -345,23 +295,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // --- Clean Memory & Deallocation ---
-    for (int i = 0; i < MAX_SESSIONS; i++) {
-        if (sessions[i].parser) parser_destroy(sessions[i].parser);
-        if (sessions[i].win) window_destroy(sessions[i].win);
-        if (sessions[i].is_alive && sessions[i].master_fd >= 0) {
-            close(sessions[i].master_fd);
-        }
-    }
-    
-    if (tab_bar) tabs_destroy(tab_bar);
-    if (status_bar) statusbar_destroy(status_bar);
-    if (token_scanner) scanner_destroy(token_scanner);
-    if (engine_cb) clipboard_destroy(engine_cb);
-    if (scr) screen_destroy(scr);
+    // --- Modularized Cleanup ---
+    sessions_cleanup_all(sessions, tab_bar, status_bar, token_scanner, engine_cb, scr);
 
     write(STDOUT_FILENO, "\033[?1049l", 8);
-
     printf("\r\nBDH Pure Linux CLI Multiplexer Exited Cleanly.\r\n");
     return EXIT_SUCCESS;
 }
