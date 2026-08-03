@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Ctrl+A Crash Fixed)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Mouse & Keyboard Full Support)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
     StatusBar *status_bar = statusbar_create();
     
     statusbar_set_mode(status_bar, "NORMAL");
-    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
+    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A/Click: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
 
     char *tab_names[MAX_SESSIONS] = {
         "BASH-1", "BASH-2", "BASH-3", "BASH-4", "BASH-5", "BASH-6"
@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        // --- 1. Keyboard Input ---
+        // --- 1. Keyboard & Mouse Input ---
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer));
             if (nread > 0) {
@@ -153,6 +153,43 @@ int main(int argc, char *argv[]) {
                     token_scanner->is_scanning_mode = 0;
                     if (status_bar) statusbar_set_mode(status_bar, "NORMAL");
                     continue;
+                }
+
+                // --- 1. MOUSE INTERCEPTOR: மவுஸ் கிளிக் ஈவென்ட் சோதனை ---
+                MouseEvent mouse;
+                if (mouse_parse_sgr(buffer, &mouse)) {
+                    // Top Tab Bar (row == 0) மீது Left Click செய்திருந்தால் Tab-ஐ மாற்ற வேண்டும்:
+                    if (mouse.row == 0 && mouse.button == MOUSE_BTN_LEFT && !mouse.is_release) {
+                        // 50x220 திரையில் ஒரு டேபின் அகலம் தோராயமாக 25 எழுத்துக்கள் எனில்:
+                        int clicked_tab = mouse.col / 25; 
+                        
+                        if (clicked_tab >= 0 && clicked_tab < MAX_SESSIONS && 
+                            sessions[clicked_tab].is_alive && sessions[clicked_tab].win != NULL) {
+                            
+                            // பழைய டேபை Inactive ஆக்குதல்
+                            sessions[active_idx].win->z_index = 0;
+                            sessions[active_idx].win->is_active = 0;
+                            snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), 
+                                     "[ TAB %d/%d : %s ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+
+                            // கிளிக் செய்த டேபை Active ஆக்குதல்
+                            active_idx = clicked_tab;
+                            sessions[active_idx].win->z_index = 1;
+                            sessions[active_idx].win->is_active = 1;
+                            snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), 
+                                     "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+
+                            if (tab_bar) tabs_set_active(tab_bar, active_idx);
+
+                            write(STDOUT_FILENO, "\033[?7l", 5);
+                            renderer_draw_all(scr, sessions, MAX_SESSIONS);
+                            if (tab_bar) tabs_draw(scr, tab_bar, 0);
+                            if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+                            write(STDOUT_FILENO, "\033[?7h", 5);
+                        }
+                    }
+                    // மவுஸ் ஈவென்ட்டை Shell-க்கு அனுப்பாமல் இங்கேயே முடித்துவிடுகிறோம்
+                    continue; 
                 }
 
                 // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch - 100% Crash Proof) ---
