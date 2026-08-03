@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Production-Ready + Token Scanner)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Production-Ready + Full UI)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,9 +12,11 @@
 #include "engine/pty.h"
 #include "engine/screen.h"
 #include "ui/panes.h"
+#include "ui/tabs.h"           // <-- NEW UI: Tab Bar
+#include "ui/statusbar.h"      // <-- NEW UI: Status Bar
 #include "engine/parser.h"
 #include "engine/clipboard.h"
-#include "engine/scanner.h"    // <-- NEW: Token Scanner Module
+#include "engine/scanner.h"    // <-- Token Scanner Module
 #include "engine/cursor.h"
 #include "engine/input.h"
 #include "engine/renderer.h"
@@ -55,7 +57,7 @@ int main(int argc, char *argv[]) {
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
-    printf("\r\n[BDH Engine] Starting 100%% Pure CLI Mode (With Smart Token Scanner)...\r\n");
+    printf("\r\n[BDH Engine] Starting 100%% Pure CLI Mode (With Full UI & Token Scanner)...\r\n");
 
     char *shell_argv[] = {"/bin/bash", NULL};
     terminal_enable_raw_mode();
@@ -68,6 +70,7 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 0) ? ws.ws_row : 38;
     int scr_cols = (ws.ws_col > 0) ? ws.ws_col : 135;
 
+    // மேலே Tab Bar (1 வரி) மற்றும் கீழே Status Bar (1 வரி) போக உள்ளே PTY அளவு:
     int pty_rows = scr_rows - 2;
     int pty_cols = scr_cols - 2;
 
@@ -82,8 +85,15 @@ int main(int argc, char *argv[]) {
     const char *default_cmd = "echo BDH CLI Multiplexer Active!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
-    // --- NEW: Token Scanner-ஐ உருவாக்குகிறோம் ---
     TokenScanner *token_scanner = scanner_create();
+
+    // --- NEW: UI Tab Bar & Status Bar உருவாக்கம் ---
+    TabBar *tab_bar = tabs_create();
+    tabs_add(tab_bar, "PRIMARY BASH");
+    tabs_add(tab_bar, "SECONDARY BASH");
+
+    StatusBar *status_bar = statusbar_create();
+    statusbar_set_mode(status_bar, "NORMAL");
 
     // --- Session 0 (Primary Window) ---
     sessions[0].id = 0;
@@ -99,7 +109,10 @@ int main(int argc, char *argv[]) {
     sessions[1].parser = parser_create();
     sessions[1].is_alive = 1;
 
+    // முதல் முறை விண்டோக்கள் + UI வரைதல்:
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
+    tabs_draw(scr, tab_bar, 0);
+    statusbar_draw(scr, status_bar, scr_rows - 1);
 
     fd_set read_fds;
     char buffer[16384]; // 16 KB Anti-Glitch Buffer
@@ -147,6 +160,7 @@ int main(int argc, char *argv[]) {
                         printf("\r\n[BDH Scanner] Scan cancelled.\r\n");
                     }
                     token_scanner->is_scanning_mode = 0;
+                    statusbar_set_mode(status_bar, "NORMAL"); // <-- UI Mode Restore
                     continue; // ஷெல்லுக்கு இந்த கீயை அனுப்பாமல் தடுக்கிறோம்
                 }
 
@@ -157,6 +171,7 @@ int main(int argc, char *argv[]) {
                     int count = scanner_scan_screen(token_scanner, scr);
                     if (count > 0) {
                         token_scanner->is_scanning_mode = 1;
+                        statusbar_set_mode(status_bar, "SCANNER"); // <-- UI Mode Switch to SCANNER!
                         printf("\r\n\033[1;33m[BDH Scanner] Found %d tokens! Press 1-%d to copy, or any other key to cancel:\033[0m\r\n", count, count);
                         for (int t = 0; t < count; t++) {
                             printf("  \033[1;36m[%d]\033[0m %s\r\n", token_scanner->tokens[t].id, token_scanner->tokens[t].text);
@@ -188,7 +203,11 @@ int main(int argc, char *argv[]) {
                         strncpy(sessions[active_idx].win->title, 
                                 active_idx == 0 ? "[ TAB 1/2 : PRIMARY BASH (ACTIVE) * ]" : "[ TAB 2/2 : SECONDARY BASH (ACTIVE) * ]", 63);
 
+                        tabs_set_active(tab_bar, active_idx); // <-- UI Tab Bar-லும் Active Tab-ஐ மாற்றுகிறோம்
+
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
+                        tabs_draw(scr, tab_bar, 0);
+                        statusbar_draw(scr, status_bar, scr_rows - 1);
                         break;
 
                     case INPUT_ACTION_OPEN_BROWSER: {
@@ -265,8 +284,13 @@ int main(int argc, char *argv[]) {
             break;
         }
 
+        // --- UI Rendering Block ---
         if (needs_render) {
             renderer_draw_all(scr, sessions, MAX_SESSIONS);
+            
+            // மேலே Top Tab Bar (Row 0) மற்றும் கீழே Bottom Status Bar (Last Row) வரைதல்:
+            tabs_draw(scr, tab_bar, 0);
+            statusbar_draw(scr, status_bar, scr_rows - 1);
         }
     }
 
@@ -279,7 +303,9 @@ int main(int argc, char *argv[]) {
         }
     }
     
-    scanner_destroy(token_scanner); // <-- NEW: Scanner Cleanup
+    tabs_destroy(tab_bar);          // <-- UI Memory Cleanup
+    statusbar_destroy(status_bar);  // <-- UI Memory Cleanup
+    scanner_destroy(token_scanner);
     clipboard_destroy(engine_cb);
     screen_destroy(scr);
     printf("\r\nBDH Pure Linux CLI Multiplexer Exited Cleanly.\r\n");
