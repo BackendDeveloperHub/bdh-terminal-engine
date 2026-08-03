@@ -1,14 +1,10 @@
-// src/engine/pty.h
-#ifndef BDH_PTY_H
-#define BDH_PTY_H
+// include/engine/pty.h - BDH PTY Module Header
+#ifndef PTY_H
+#define PTY_H
 
-#include <termios.h>
-#include <sys/ioctl.h>
 #include <sys/types.h>
 
-// PTY-ஐ உருவாக்கி, புதிய Shell-ஐ Spawn செய்யும் பங்க்ஷன்
-// input: argv[] (எந்த shell run பண்ணனும்), master_fd (engine control FD), rows (உள் உயரம்), cols (உள் அகலம்)
-// return: Child Process ID (PID)
 pid_t pty_spawn(char *const argv[], int *master_fd, int rows, int cols);
+int pty_resize(int master_fd, int rows, int cols); // <-- புதிய Resize ஃபங்ஷன் டிக்ளரேஷன்
 
-#endif // BDH_PTY_H
+#endif
