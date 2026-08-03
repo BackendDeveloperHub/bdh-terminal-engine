@@ -1,8 +1,8 @@
 main{
 
 
-call make clean;
-call gcc -g src/main.c src/engine/pty.c src/engine/screen.c src/engine/session.c src/ui/panes.c src/ui/wm.c src/ui/tabs.c src/ui/statusbar.c src/engine/parser.c src/engine/clipboard.c src/engine/scanner.c src/engine/cursor.c src/engine/input.c src/engine/renderer.c src/engine/terminal.c -Iinclude -Isrc -D_GNU_SOURCE -Wall -Wextra -lutil -o bdh-engine;
+call( make clean);
+call( gcc -g src/main.c src/engine/pty.c src/engine/screen.c src/engine/session.c src/ui/panes.c src/ui/wm.c src/ui/tabs.c src/ui/statusbar.c src/engine/parser.c src/engine/clipboard.c src/engine/scanner.c src/engine/cursor.c src/engine/input.c src/engine/renderer.c src/engine/terminal.c -Iinclude -Isrc -D_GNU_SOURCE -Wall -Wextra -lutil -o bdh-engine);
 
 
 
