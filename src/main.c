@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Clean Production Build)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Force Layout Production Build)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -70,9 +70,9 @@ int main(int argc, char *argv[]) {
         ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
     }
     
-    // --- 50 Rows x 220 Columns Layout ---
-    int scr_rows = (ws.ws_row > 0) ? ws.ws_row : 50;   
-    int scr_cols = (ws.ws_col > 0) ? ws.ws_col : 220;  
+    // --- FORCE 50 Rows x 220 Columns Layout (No ioctl Override) ---
+    int scr_rows = 50;   
+    int scr_cols = 220;  
 
     int pty_rows = scr_rows - 2;
     int pty_cols = scr_cols - 2;
