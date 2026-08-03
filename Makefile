@@ -18,12 +18,8 @@ TARGET = bdh-engine
 
 all: $(TARGET)
 
-# CLI Browser-க்கான links பேக்கேஜை மட்டும் செக் செய்ய:
-deps:
-	@echo "Checking and installing required CLI browser package..."
-	sudo pacman -S --needed links
-
-$(TARGET): deps $(SRCS)
+# sudo கட்டளை நீக்கப்பட்டு, C கோடுகள் மட்டுமே கம்பைல் ஆகும்:
+$(TARGET): $(SRCS)
 	$(CC) $(SRCS) $(CFLAGS) $(LDFLAGS) -o $(TARGET)
 	@echo "BDH Pure Linux CLI Multiplexer Engine built successfully! 🚀"
 
@@ -31,4 +27,4 @@ clean:
 	rm -f $(TARGET) *.o
 	@echo "Cleaned old builds successfully!"
 
-.PHONY: all deps clean
+.PHONY: all clean
