@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Final Bulletproof Build)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Final Clean Production Build)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,8 +12,9 @@
 #include "engine/pty.h"
 #include "engine/screen.h"
 #include "ui/panes.h"
-#include "ui/tabs.h"           // UI: Top Tab Bar
-#include "ui/statusbar.h"      // UI: Bottom Status Bar
+#include "ui/wm.h"             // UI: Window Manager Module
+#include "ui/tabs.h"           // UI: Top Tab Bar Module
+#include "ui/statusbar.h"      // UI: Bottom Status Bar Module
 #include "engine/parser.h"
 #include "engine/clipboard.h"
 #include "engine/scanner.h"    // Smart Token Scanner (Ctrl+K)
@@ -103,7 +104,7 @@ int main(int argc, char *argv[]) {
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
     statusbar_set_mode(status_bar, "NORMAL");
-    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+K: Scan | exit: Quit");
+    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
 
     char *tab_names[MAX_SESSIONS] = {
         "BASH-1", "BASH-2", "BASH-3", "BASH-4", "BASH-5", "BASH-6"
@@ -185,7 +186,7 @@ int main(int argc, char *argv[]) {
                 }
 
                 // =================================================================
-                // --- SAFE INTERCEPTOR: Ctrl+A (ASCII 1) -> TAB SWITCH ---
+                // --- SAFE INTERCEPTOR 1: Ctrl+A (ASCII 1) -> TAB SWITCH ---
                 // =================================================================
                 if (buffer[0] == 1) { 
                     if (sessions[active_idx].win != NULL) {
@@ -221,7 +222,25 @@ int main(int argc, char *argv[]) {
                 }
 
                 // =================================================================
-                // --- SAFE INTERCEPTOR: Ctrl+K (ASCII 11) -> TOKEN SCANNER ---
+                // --- SAFE INTERCEPTOR 2: Ctrl+B (ASCII 2) -> OPEN BROWSER ---
+                // =================================================================
+                if (buffer[0] == 2) {
+                    const char *target_url = getenv("BDH_URL");
+                    if (!target_url || strlen(target_url) == 0) {
+                        target_url = "https://github.com/BackendDeveloperHub";
+                    }
+                    
+                    char browser_cmd[512];
+                    snprintf(browser_cmd, sizeof(browser_cmd), "links %s\n", target_url);
+                    
+                    if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
+                        write(sessions[active_idx].master_fd, browser_cmd, strlen(browser_cmd));
+                    }
+                    continue;
+                }
+
+                // =================================================================
+                // --- SAFE INTERCEPTOR 3: Ctrl+K (ASCII 11) -> TOKEN SCANNER ---
                 // =================================================================
                 if (buffer[0] == 11) { 
                     int count = scanner_scan_screen(token_scanner, scr);
@@ -233,33 +252,18 @@ int main(int argc, char *argv[]) {
                             printf("  \033[1;36m[%d]\033[0m %s\r\n", token_scanner->tokens[t].id, token_scanner->tokens[t].text);
                         }
                     } else {
-                        printf("\r\n\033[1;31m[BDH Scanner] No URLs, IPs, UUIDs, or Paths found on screen.\033[0m\r\n");
+                        printf("\r\n\033[1;31m[BDH Scanner] No URLs, IPs, UUIDs, or Paths found on screen.\r\n");
                     }
                     continue;
                 }
 
-                // --- Normal Keyboard Input (Safe after interceptors) ---
+                // --- Normal Keyboard Input ---
                 InputAction action = input_parse_key(buffer[0], engine_cb, "ls -la /home\n");
 
                 switch (action) {
                     case INPUT_ACTION_EXIT:
                         engine_running = 0;
                         break;
-
-                    case INPUT_ACTION_OPEN_BROWSER: {
-                        const char *target_url = getenv("BDH_URL");
-                        if (!target_url || strlen(target_url) == 0) {
-                            target_url = "https://github.com/BackendDeveloperHub";
-                        }
-                        
-                        char browser_cmd[512];
-                        snprintf(browser_cmd, sizeof(browser_cmd), "links %s\n", target_url);
-                        
-                        if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
-                            write(sessions[active_idx].master_fd, browser_cmd, strlen(browser_cmd));
-                        }
-                        break;
-                    }
 
                     case INPUT_ACTION_PASTE: {
                         const char *paste_data = clipboard_get(engine_cb);
