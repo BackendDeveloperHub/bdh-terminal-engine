@@ -1,10 +1,15 @@
-// include/engine/session.h - BDH Terminal Session Management Header
+// include/engine/session.h - BDH Terminal Session Management Header (Fixed)
 #ifndef SESSION_H
 #define SESSION_H
 
 #include <sys/types.h>
 #include "ui/panes.h"
+#include "ui/tabs.h"          // Added for TabBar
+#include "ui/statusbar.h"     // Added for StatusBar
 #include "engine/parser.h"
+#include "engine/scanner.h"   // Added for TokenScanner
+#include "engine/clipboard.h" // Added for Clipboard
+#include "engine/screen.h"    // Added for VirtualScreen
 
 #define MAX_SESSIONS 6
 
