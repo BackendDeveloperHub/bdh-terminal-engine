@@ -1,4 +1,4 @@
-// src/engine/session.c - BDH Terminal Session Management Implementation (Signal 11 Fixed)
+// src/engine/session.c - BDH Terminal Session Management Implementation (Ctrl+A Crash Fixed)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +6,7 @@
 #include <sys/wait.h>
 #include "engine/session.h"
 #include "engine/pty.h"
-#include "ui/wm.h"            // <-- FIX: Signal 11 (Pointer Truncation) எரரைத் தடுக்க wm.h சேர்க்கப்பட்டுள்ளது!
+#include "ui/wm.h"
 #include "ui/tabs.h"
 #include "ui/statusbar.h"
 #include "engine/scanner.h"
@@ -32,9 +32,12 @@ void sessions_init_all(TerminalSession sessions[MAX_SESSIONS], char *shell_argv[
             }
         }
 
-        char win_title[64];
-        snprintf(win_title, sizeof(win_title), "[ TAB %d/%d : %s %s ]", 
-                 i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
+        // --- FIX: Heap Memory Allocation (Prevents Signal 11 on Ctrl+A Tab Switch) ---
+        char *win_title = (char *)malloc(64);
+        if (win_title) {
+            snprintf(win_title, 64, "[ TAB %d/%d : %s %s ]", 
+                     i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
+        }
                  
         sessions[i].win = window_create(i, 0, 1, scr_cols, scr_rows - 2, win_title, (i == 0) ? 1 : 0);
         sessions[i].parser = parser_create();
@@ -51,7 +54,10 @@ void sessions_init_all(TerminalSession sessions[MAX_SESSIONS], char *shell_argv[
 void sessions_cleanup_all(TerminalSession sessions[MAX_SESSIONS], TabBar *tab_bar, StatusBar *status_bar, TokenScanner *token_scanner, Clipboard *engine_cb, VirtualScreen *scr) {
     for (int i = 0; i < MAX_SESSIONS; i++) {
         if (sessions[i].parser) parser_destroy(sessions[i].parser);
-        if (sessions[i].win) window_destroy(sessions[i].win);
+        if (sessions[i].win) {
+            if (sessions[i].win->title) free(sessions[i].win->title);
+            window_destroy(sessions[i].win);
+        }
         if (sessions[i].is_alive && sessions[i].master_fd >= 0) {
             close(sessions[i].master_fd);
         }
