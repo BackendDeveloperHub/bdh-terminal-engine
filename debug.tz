@@ -1,7 +1,7 @@
 main{
   
 call(gdb ./bdh-engine);
-print("(gdb) run")
+print("(gdb) run");
 
 
 }
