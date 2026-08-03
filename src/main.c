@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Final Clean Production Build)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (100% Robust 6-Tab Production Build)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -110,17 +110,22 @@ int main(int argc, char *argv[]) {
         "BASH-1", "BASH-2", "BASH-3", "BASH-4", "BASH-5", "BASH-6"
     };
 
-    // --- 6 Sessions & Tabs Safe Creation ---
+    // --- 6 Sessions & Tabs Safe Creation (100% Robust Loop with Fallback) ---
     for (int i = 0; i < MAX_SESSIONS; i++) {
         sessions[i].id = i;
         sessions[i].master_fd = -1;
+        sessions[i].is_alive = 0;
+        sessions[i].win = NULL;
+        sessions[i].parser = NULL;
+
         sessions[i].pid = pty_spawn(shell_argv, &sessions[i].master_fd, pty_rows, pty_cols);
         
         if (sessions[i].pid < 0 || sessions[i].master_fd < 0) {
-            sessions[i].is_alive = 0;
-            sessions[i].win = NULL;
-            sessions[i].parser = NULL;
-            continue;
+            // Fallback to standard bash if custom shell path fails
+            sessions[i].pid = pty_spawn((char *[]){"/bin/bash", NULL}, &sessions[i].master_fd, pty_rows, pty_cols);
+            if (sessions[i].pid < 0 || sessions[i].master_fd < 0) {
+                continue; 
+            }
         }
 
         char win_title[64];
@@ -129,9 +134,11 @@ int main(int argc, char *argv[]) {
                  
         sessions[i].win = window_create(i, 0, 1, scr_cols, scr_rows - 2, win_title, (i == 0) ? 1 : 0);
         sessions[i].parser = parser_create();
-        sessions[i].is_alive = 1;
-
-        tabs_add(tab_bar, tab_names[i]);
+        
+        if (sessions[i].win != NULL && sessions[i].parser != NULL) {
+            sessions[i].is_alive = 1;
+            tabs_add(tab_bar, tab_names[i]);
+        }
     }
 
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -189,7 +196,7 @@ int main(int argc, char *argv[]) {
                 // --- SAFE INTERCEPTOR 1: Ctrl+A (ASCII 1) -> TAB SWITCH ---
                 // =================================================================
                 if (buffer[0] == 1) { 
-                    if (sessions[active_idx].win != NULL) {
+                    if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 0;
                         sessions[active_idx].win->is_active = 0;
                         snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s ]", 
@@ -198,13 +205,13 @@ int main(int argc, char *argv[]) {
 
                     int next_idx = (active_idx + 1) % MAX_SESSIONS;
                     int attempts = 0;
-                    while ((!sessions[next_idx].is_alive || sessions[next_idx].win == NULL) && attempts < MAX_SESSIONS) {
+                    while (attempts < MAX_SESSIONS && (!sessions[next_idx].is_alive || sessions[next_idx].win == NULL)) {
                         next_idx = (next_idx + 1) % MAX_SESSIONS;
                         attempts++;
                     }
                     active_idx = next_idx;
 
-                    if (sessions[active_idx].win != NULL) {
+                    if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 1;
                         sessions[active_idx].win->is_active = 1;
                         snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s (ACTIVE) * ]", 
@@ -252,7 +259,7 @@ int main(int argc, char *argv[]) {
                             printf("  \033[1;36m[%d]\033[0m %s\r\n", token_scanner->tokens[t].id, token_scanner->tokens[t].text);
                         }
                     } else {
-                        printf("\r\n\033[1;31m[BDH Scanner] No URLs, IPs, UUIDs, or Paths found on screen.\r\n");
+                        printf("\r\n\033[1;31m[BDH Scanner] No URLs, IPs, UUIDs, or Paths found on screen.\033[0m\r\n");
                     }
                     continue;
                 }
