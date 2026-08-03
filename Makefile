@@ -3,11 +3,14 @@ CC = gcc
 CFLAGS = -Iinclude -Isrc -D_GNU_SOURCE -Wall -Wextra
 LDFLAGS = -lutil
 
-# புதிய src/engine/scanner.c கீழே சேர்க்கப்பட்டுள்ளது:
+# எல்லா Engine மற்றும் UI மாட்யூல்களும் முழுமையாக சேர்க்கப்பட்டுள்ளது:
 SRCS = src/main.c \
        src/engine/pty.c \
        src/engine/screen.c \
        src/ui/panes.c \
+       src/ui/wm.c \
+       src/ui/tabs.c \
+       src/ui/statusbar.c \
        src/engine/parser.c \
        src/engine/clipboard.c \
        src/engine/scanner.c \
