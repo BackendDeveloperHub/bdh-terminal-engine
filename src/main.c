@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Custom Layout)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Clean Production Build)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -253,7 +253,7 @@ int main(int argc, char *argv[]) {
             if (FD_ISSET(sessions[i].master_fd, &read_fds)) {
                 nread = read(sessions[i].master_fd, buffer, sizeof(buffer));
                 
-                |                if (nread > 0) {
+                if (nread > 0) {
                     if (i == active_idx && sessions[i].win && sessions[i].win->is_active && sessions[i].parser) {
                         for (int k = 0; k < nread; k++) {
                             parser_feed_char(sessions[i].parser, scr, sessions[i].win, buffer[k]);
