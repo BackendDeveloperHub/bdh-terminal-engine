@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Ultimate 6-Tab + Anti-Scroll Fix)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Ultimate 6-Tab Stable Build)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -35,7 +35,10 @@ typedef struct {
 } TerminalSession;
 
 static void fatal_signal_handler(int signo) {
+    // --- FIX 1: கிராஷ் ஆனாலும் Alternate Screen-ல் இருந்து நார்மல் ஸ்கிரீனுக்கு திரும்புதல் ---
+    write(STDOUT_FILENO, "\033[?1049l", 8);
     terminal_disable_raw_mode();
+    
     char msg[128];
     int len = snprintf(msg, sizeof(msg), "\r\n[BDH Engine] Fatal error: Caught signal %d. Terminal state restored cleanly.\r\n", signo);
     write(STDOUT_FILENO, msg, len);
@@ -63,6 +66,9 @@ int main(int argc, char *argv[]) {
     char *shell_argv[] = {"/bin/bash", NULL};
     terminal_enable_raw_mode();
 
+    // --- FIX 1: Alternate Screen Buffer-ஐ ஆன் செய்கிறோம் (tmux/vim style) ---
+    write(STDOUT_FILENO, "\033[?1049h\033[H", 11);
+
     struct winsize ws = {0};
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1) {
         ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
@@ -74,9 +80,6 @@ int main(int argc, char *argv[]) {
     // மேலே Tab Bar (1 வரி) மற்றும் கீழே Status Bar (1 வரி) போக உள்ளே PTY அளவு:
     int pty_rows = scr_rows - 2;
     int pty_cols = scr_cols - 2;
-
-    printf("\r\n[BDH Engine] Detected Screen Size: %d cols x %d rows (PTY Inner: %d x %d)\r\n", 
-           scr_cols, scr_rows, pty_cols, pty_rows);
 
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
     TerminalSession sessions[MAX_SESSIONS];
@@ -106,7 +109,7 @@ int main(int argc, char *argv[]) {
         snprintf(win_title, sizeof(win_title), "[ TAB %d/%d : %s %s ]", 
                  i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
                  
-        // --- FIX 1: y=1 மற்றும் height=scr_rows-2 என மாற்றப்பட்டுள்ளது (Border ரிபீட் ஆகாமல் தடுக்க) ---
+        // y=1 மற்றும் height=scr_rows-2 என அமைக்கப்பட்ட Window Layout:
         sessions[i].win = window_create(i, 0, 1, scr_cols, scr_rows - 2, win_title, (i == 0) ? 1 : 0);
         sessions[i].parser = parser_create();
         sessions[i].is_alive = 1;
@@ -276,10 +279,13 @@ int main(int argc, char *argv[]) {
                 nread = read(sessions[i].master_fd, buffer, sizeof(buffer));
                 
                 if (nread > 0) {
-                    for (int k = 0; k < nread; k++) {
-                        parser_feed_char(sessions[i].parser, scr, sessions[i].win, buffer[k]);
+                    // --- FIX 2 (SEGFAULT PROTECTION): தற்போதைய Active Tab-ன் அவுட்புட்டை மட்டுமே ஸ்கிரீனுக்கு அனுப்புகிறோம்! ---
+                    if (i == active_idx && sessions[i].win && sessions[i].win->is_active) {
+                        for (int k = 0; k < nread; k++) {
+                            parser_feed_char(sessions[i].parser, scr, sessions[i].win, buffer[k]);
+                        }
+                        needs_render = 1;
                     }
-                    needs_render = 1;
                 } 
                 else if (nread == 0 || errno == EIO) {
                     int status;
@@ -291,11 +297,13 @@ int main(int argc, char *argv[]) {
                         sessions[i].win->is_active = 0;
                     }
                     
-                    char exit_msg[] = "\r\n[Session Exited - Switch tab to continue]\r\n";
-                    for (size_t k = 0; k < strlen(exit_msg); k++) {
-                        parser_feed_char(sessions[i].parser, scr, sessions[i].win, exit_msg[k]);
+                    if (i == active_idx) {
+                        char exit_msg[] = "\r\n[Session Exited - Switch tab to continue]\r\n";
+                        for (size_t k = 0; k < strlen(exit_msg); k++) {
+                            parser_feed_char(sessions[i].parser, scr, sessions[i].win, exit_msg[k]);
+                        }
+                        needs_render = 1;
                     }
-                    needs_render = 1;
                 }
             }
         }
@@ -306,7 +314,7 @@ int main(int argc, char *argv[]) {
 
         // --- UI Rendering Block ---
         if (needs_render) {
-            // --- FIX 2: VT100 Auto Line-Wrap Disable (ஸ்க்ரோல் ஆவதை முழுமையாகத் தடுக்க) ---
+            // VT100 Auto Line-Wrap Disable (ஸ்க்ரோல் ஆவதை முழுமையாகத் தடுக்க):
             write(STDOUT_FILENO, "\033[?7l", 5);
 
             renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -334,6 +342,10 @@ int main(int argc, char *argv[]) {
     scanner_destroy(token_scanner);
     clipboard_destroy(engine_cb);
     screen_destroy(scr);
+
+    // --- FIX 1: நார்மல் டெர்மினல் ஸ்கிரீனுக்கு திரும்புதல் ---
+    write(STDOUT_FILENO, "\033[?1049l", 8);
+
     printf("\r\nBDH Pure Linux CLI Multiplexer Exited Cleanly.\r\n");
     return EXIT_SUCCESS;
 }
