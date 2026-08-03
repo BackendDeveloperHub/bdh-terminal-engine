@@ -1,4 +1,4 @@
-// src/engine/session.c - BDH Terminal Session Management Implementation (Ctrl+A Crash Fixed)
+// src/engine/session.c - BDH Terminal Session Management Implementation (Zero-Warning Clean Build)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,12 +32,10 @@ void sessions_init_all(TerminalSession sessions[MAX_SESSIONS], char *shell_argv[
             }
         }
 
-        // --- FIX: Heap Memory Allocation (Prevents Signal 11 on Ctrl+A Tab Switch) ---
-        char *win_title = (char *)malloc(64);
-        if (win_title) {
-            snprintf(win_title, 64, "[ TAB %d/%d : %s %s ]", 
-                     i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
-        }
+        // --- Clean Array Title Buffer ---
+        char win_title[64];
+        snprintf(win_title, sizeof(win_title), "[ TAB %d/%d : %s %s ]", 
+                 i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
                  
         sessions[i].win = window_create(i, 0, 1, scr_cols, scr_rows - 2, win_title, (i == 0) ? 1 : 0);
         sessions[i].parser = parser_create();
@@ -55,8 +53,7 @@ void sessions_cleanup_all(TerminalSession sessions[MAX_SESSIONS], TabBar *tab_ba
     for (int i = 0; i < MAX_SESSIONS; i++) {
         if (sessions[i].parser) parser_destroy(sessions[i].parser);
         if (sessions[i].win) {
-            if (sessions[i].win->title) free(sessions[i].win->title);
-            window_destroy(sessions[i].win);
+            window_destroy(sessions[i].win); // --- FIX: No free(win->title) needed for char[64] array! ---
         }
         if (sessions[i].is_alive && sessions[i].master_fd >= 0) {
             close(sessions[i].master_fd);
