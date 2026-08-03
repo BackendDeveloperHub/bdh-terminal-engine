@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Zero-Warning Clean Safe)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Signal 11 Fixed)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch - Clean Array Safe) ---
+                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch - 100% Signal 11 Crash Proof) ---
                 if (buffer[0] == 1) { 
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 0;
@@ -165,22 +165,23 @@ int main(int argc, char *argv[]) {
                         next_idx = (next_idx + 1) % MAX_SESSIONS;
                         attempts++;
                     }
-                    active_idx = next_idx;
 
-                    if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
+                    // --- FIX: அடுத்த Session உயிருடன் இருந்தால் மட்டுமே Tab-ஐ மாற்றும் பாதுகாப்பு ---
+                    if (sessions[next_idx].is_alive && sessions[next_idx].win != NULL) {
+                        active_idx = next_idx;
                         sessions[active_idx].win->z_index = 1;
                         sessions[active_idx].win->is_active = 1;
                         snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), 
                                  "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+
+                        if (tab_bar) tabs_set_active(tab_bar, active_idx);
+
+                        write(STDOUT_FILENO, "\033[?7l", 5);
+                        renderer_draw_all(scr, sessions, MAX_SESSIONS);
+                        if (tab_bar) tabs_draw(scr, tab_bar, 0);
+                        if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+                        write(STDOUT_FILENO, "\033[?7h", 5);
                     }
-
-                    if (tab_bar) tabs_set_active(tab_bar, active_idx);
-
-                    write(STDOUT_FILENO, "\033[?7l", 5);
-                    renderer_draw_all(scr, sessions, MAX_SESSIONS);
-                    if (tab_bar) tabs_draw(scr, tab_bar, 0);
-                    if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
-                    write(STDOUT_FILENO, "\033[?7h", 5);
                     continue; 
                 }
 
@@ -241,7 +242,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // --- 2. Shell Output & Safe Background Filtering ---
+        // --- 2. Shell Output & Background Session Parsing (Signal 11 Fix) ---
         int needs_render = 0;
         int active_sessions_count = 0;
 
@@ -253,11 +254,14 @@ int main(int argc, char *argv[]) {
                 nread = read(sessions[i].master_fd, buffer, sizeof(buffer));
                 
                 if (nread > 0) {
-                    if (i == active_idx && sessions[i].win && sessions[i].win->is_active && sessions[i].parser) {
+                    // --- FIX: எல்லா 6 Sessions-ம் பின்னணியில் Parse செய்யப்பட வேண்டும்! ---
+                    if (sessions[i].win && sessions[i].parser) {
                         for (int k = 0; k < nread; k++) {
                             parser_feed_char(sessions[i].parser, scr, sessions[i].win, buffer[k]);
                         }
-                        needs_render = 1;
+                        if (i == active_idx) {
+                            needs_render = 1;
+                        }
                     }
                 } 
                 else if (nread == 0 || errno == EIO) {
