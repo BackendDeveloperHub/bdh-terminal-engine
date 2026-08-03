@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Force Layout Production Build)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Ctrl+A Safe)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
         ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
     }
     
-    // --- FORCE 50 Rows x 220 Columns Layout (No ioctl Override) ---
+    // --- FORCE 50 Rows x 220 Columns Layout ---
     int scr_rows = 50;   
     int scr_cols = 220;  
 
@@ -97,7 +97,6 @@ int main(int argc, char *argv[]) {
         "BASH-1", "BASH-2", "BASH-3", "BASH-4", "BASH-5", "BASH-6"
     };
 
-    // --- Modularized Session & Tab Initialization ---
     sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -151,13 +150,15 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // --- Interceptor 1: Ctrl+A (Tab Switch) ---
+                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch - 100% Signal 11 Safe) ---
                 if (buffer[0] == 1) { 
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 0;
                         sessions[active_idx].win->is_active = 0;
-                        snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s ]", 
-                                 active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+                        if (sessions[active_idx].win->title) {
+                            snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s ]", 
+                                     active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+                        }
                     }
 
                     int next_idx = (active_idx + 1) % MAX_SESSIONS;
@@ -171,8 +172,10 @@ int main(int argc, char *argv[]) {
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 1;
                         sessions[active_idx].win->is_active = 1;
-                        snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s (ACTIVE) * ]", 
-                                 active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+                        if (sessions[active_idx].win->title) {
+                            snprintf(sessions[active_idx].win->title, 63, "[ TAB %d/%d : %s (ACTIVE) * ]", 
+                                     active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+                        }
                     }
 
                     if (tab_bar) tabs_set_active(tab_bar, active_idx);
@@ -296,7 +299,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // --- Modularized Cleanup ---
     sessions_cleanup_all(sessions, tab_bar, status_bar, token_scanner, engine_cb, scr);
 
     write(STDOUT_FILENO, "\033[?1049l", 8);
