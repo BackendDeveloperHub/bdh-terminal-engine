@@ -3,10 +3,11 @@ CC = gcc
 CFLAGS = -Iinclude -Isrc -D_GNU_SOURCE -Wall -Wextra
 LDFLAGS = -lutil
 
-# எல்லா Engine மற்றும் UI மாட்யூல்களும் முழுமையாக சேர்க்கப்பட்டுள்ளது:
+# --- FIX: புதிய session.c மாட்யூல் இங்கு சேர்க்கப்பட்டுள்ளது ---
 SRCS = src/main.c \
        src/engine/pty.c \
        src/engine/screen.c \
+       src/engine/session.c \
        src/ui/panes.c \
        src/ui/wm.c \
        src/ui/tabs.c \
