@@ -4,12 +4,13 @@
 
 #include <sys/types.h>
 #include "ui/panes.h"
-#include "ui/tabs.h"          // Added for TabBar
-#include "ui/statusbar.h"     // Added for StatusBar
+#include "ui/wm.h"            // <-- FIX: Signal 11 எரரைத் தடுக்க wm.h சேர்க்கப்பட்டுள்ளது!
+#include "ui/tabs.h"
+#include "ui/statusbar.h"
 #include "engine/parser.h"
-#include "engine/scanner.h"   // Added for TokenScanner
-#include "engine/clipboard.h" // Added for Clipboard
-#include "engine/screen.h"    // Added for VirtualScreen
+#include "engine/scanner.h"
+#include "engine/clipboard.h"
+#include "engine/screen.h"
 
 #define MAX_SESSIONS 6
 
