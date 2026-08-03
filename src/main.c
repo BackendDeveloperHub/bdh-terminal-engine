@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Signal 11 Fixed)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Ctrl+A Crash Fixed)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -78,6 +78,11 @@ int main(int argc, char *argv[]) {
     int pty_cols = scr_cols - 2;
 
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
+    if (!scr) {
+        terminal_disable_raw_mode();
+        printf("[Error] Failed to allocate VirtualScreen!\r\n");
+        return EXIT_FAILURE;
+    }
     
     TerminalSession sessions[MAX_SESSIONS];
     int active_idx = 0;
@@ -134,7 +139,7 @@ int main(int argc, char *argv[]) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer));
             if (nread > 0) {
                 
-                if (token_scanner->is_scanning_mode) {
+                if (token_scanner && token_scanner->is_scanning_mode) {
                     if (buffer[0] >= '1' && buffer[0] <= '9') {
                         int token_id = buffer[0] - '0';
                         if (scanner_copy_by_id(token_scanner, token_id, engine_cb)) {
@@ -146,11 +151,11 @@ int main(int argc, char *argv[]) {
                         printf("\r\n[BDH Scanner] Scan cancelled.\r\n");
                     }
                     token_scanner->is_scanning_mode = 0;
-                    statusbar_set_mode(status_bar, "NORMAL");
+                    if (status_bar) statusbar_set_mode(status_bar, "NORMAL");
                     continue;
                 }
 
-                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch - 100% Signal 11 Crash Proof) ---
+                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch - 100% Crash Proof) ---
                 if (buffer[0] == 1) { 
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 0;
@@ -166,7 +171,6 @@ int main(int argc, char *argv[]) {
                         attempts++;
                     }
 
-                    // --- FIX: அடுத்த Session உயிருடன் இருந்தால் மட்டுமே Tab-ஐ மாற்றும் பாதுகாப்பு ---
                     if (sessions[next_idx].is_alive && sessions[next_idx].win != NULL) {
                         active_idx = next_idx;
                         sessions[active_idx].win->z_index = 1;
@@ -206,7 +210,7 @@ int main(int argc, char *argv[]) {
                     int count = scanner_scan_screen(token_scanner, scr);
                     if (count > 0) {
                         token_scanner->is_scanning_mode = 1;
-                        statusbar_set_mode(status_bar, "SCANNER");
+                        if (status_bar) statusbar_set_mode(status_bar, "SCANNER");
                         printf("\r\n\033[1;33m[BDH Scanner] Found %d tokens! Press 1-%d to copy, or any other key to cancel:\033[0m\r\n", count, count);
                         for (int t = 0; t < count; t++) {
                             printf("  \033[1;36m[%d]\033[0m %s\r\n", token_scanner->tokens[t].id, token_scanner->tokens[t].text);
@@ -242,7 +246,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // --- 2. Shell Output & Background Session Parsing (Signal 11 Fix) ---
+        // --- 2. Shell Output & 6 Concurrent Sessions Parsing (Signal 11 Fixed) ---
         int needs_render = 0;
         int active_sessions_count = 0;
 
@@ -254,9 +258,9 @@ int main(int argc, char *argv[]) {
                 nread = read(sessions[i].master_fd, buffer, sizeof(buffer));
                 
                 if (nread > 0) {
-                    // --- FIX: எல்லா 6 Sessions-ம் பின்னணியில் Parse செய்யப்பட வேண்டும்! ---
-                    if (sessions[i].win && sessions[i].parser) {
+                    if (sessions[i].win != NULL && sessions[i].parser != NULL) {
                         for (int k = 0; k < nread; k++) {
+                            // --- FIX: NULL அனுப்பக்கூடாது! எப்போதும் scr அனுப்ப வேண்டும் (Signal 11 Fix) ---
                             parser_feed_char(sessions[i].parser, scr, sessions[i].win, buffer[k]);
                         }
                         if (i == active_idx) {
