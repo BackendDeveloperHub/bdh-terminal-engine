@@ -125,10 +125,11 @@ int main(int argc, char *argv[]) {
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         break;
 
-                    // --- 100% CLI Browser Integration ---
+                    // --- 100% CLI Browser Integration (Gzip Error Fixed!) ---
                     case INPUT_ACTION_OPEN_BROWSER: {
-                        // GUI தேவையில்லை! Active Bash டேப்பிற்குள்ளேயே w3m டெர்மினல் பிரவுசரை ஓப்பன் செய்கிறோம்:
-                        const char *browser_cmd = "w3m https://github.com/BackendDeveloperHub\n";
+                        // -o accept_encoding= சேர்ப்பதால் gzip compression error வராது!
+                        // (அல்லது நீங்கள் links இன்ஸ்டால் செய்திருந்தால் "links https://github.com..." என்றும் கொடுக்கலாம்)
+                        const char *browser_cmd = "w3m -o accept_encoding= https://github.com/BackendDeveloperHub\n";
                         write(sessions[active_idx].master_fd, browser_cmd, strlen(browser_cmd));
                         break;
                     }
