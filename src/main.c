@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Ultimate 6-Tab Production Build)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Ultimate 6-Tab + Anti-Scroll Fix)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -106,7 +106,8 @@ int main(int argc, char *argv[]) {
         snprintf(win_title, sizeof(win_title), "[ TAB %d/%d : %s %s ]", 
                  i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
                  
-        sessions[i].win = window_create(i, 0, 0, scr_cols, scr_rows, win_title, (i == 0) ? 1 : 0);
+        // --- FIX 1: y=1 மற்றும் height=scr_rows-2 என மாற்றப்பட்டுள்ளது (Border ரிபீட் ஆகாமல் தடுக்க) ---
+        sessions[i].win = window_create(i, 0, 1, scr_cols, scr_rows - 2, win_title, (i == 0) ? 1 : 0);
         sessions[i].parser = parser_create();
         sessions[i].is_alive = 1;
 
@@ -305,11 +306,17 @@ int main(int argc, char *argv[]) {
 
         // --- UI Rendering Block ---
         if (needs_render) {
+            // --- FIX 2: VT100 Auto Line-Wrap Disable (ஸ்க்ரோல் ஆவதை முழுமையாகத் தடுக்க) ---
+            write(STDOUT_FILENO, "\033[?7l", 5);
+
             renderer_draw_all(scr, sessions, MAX_SESSIONS);
             
             // மேலே Top Tab Bar (Row 0) மற்றும் கீழே Bottom Status Bar (Last Row) வரைதல்:
             tabs_draw(scr, tab_bar, 0);
             statusbar_draw(scr, status_bar, scr_rows - 1);
+
+            // மீண்டும் Auto Line-Wrap Enable:
+            write(STDOUT_FILENO, "\033[?7h", 5);
         }
     }
 
