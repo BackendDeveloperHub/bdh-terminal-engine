@@ -1,4 +1,4 @@
-// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (100% Responsive 2-Cell Margin Edition)
+// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (4-Side -2 Margin Edition)
 #include "panes.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,13 +53,13 @@ void window_scroll_up(FloatingWindow *win) {
     }
 }
 
-// 2. Responsive Border Draw Function (எந்த ஸ்கிரீன் சைஸாக இருந்தாலும் 4 பக்கமும் 2-எழுத்து Margin)
+// 2. Responsive Border Draw Function (4 பக்கமும் துல்லியமாக -2 Margin இடைவெளி)
 void window_draw(VirtualScreen *scr, FloatingWindow *win) {
-    // --- RESPONSIVE CALCULATION: ஸ்கிரீனின் 4 பக்க விளிம்பிலிருந்தும் 2 வரிகள்/எழுத்துக்கள் உள்ளே தள்ளி பார்டர் அமையும் ---
-    int start_r = 1;                  // மேலே 1 வரி இடைவெளி
-    int end_r   = scr->rows - 2;      // கீழே 2 வரிகள் இடைவெளி
-    int start_c = 2;                  // இடதுபுறம் 2 எழுத்துக்கள் இடைவெளி
-    int end_c   = scr->cols - 3;      // வலதுபுறம் 2 எழுத்துக்கள் இடைவெளி
+    // --- 4-SIDE -2 MARGIN CALCULATION ---
+    int start_r = 2;                  // Top Border (-2 வரிகள் இடைவெளி)
+    int end_r   = scr->rows - 3;      // Footer/Bottom Border (-2 வரிகள் இடைவெளி)
+    int start_c = 2;                  // Left Side Border (-2 எழுத்துக்கள் இடைவெளி)
+    int end_c   = scr->cols - 3;      // Right Side Border (-2 எழுத்துக்கள் இடைவெளி)
 
     // பாதுகாப்பு அரண் (திரை மிகச் சிறிதாக இருந்தால் கிராஷ் ஆகாமல் இருக்க Safety Check):
     if (end_r <= start_r + 2) end_r = scr->rows - 1;
