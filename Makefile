@@ -1,7 +1,8 @@
-# Makefile - BDH Pure Linux CLI Multiplexer Engine
+# Makefile - BDH Pure Linux CLI Multiplexer Engine (Universal Edition)
 CC = gcc
 CFLAGS = -Iinclude -Isrc -D_GNU_SOURCE -Wall -Wextra
 LDFLAGS = -lutil
+PREFIX ?= /usr/local
 
 # --- FIX: புதிய session.c மாட்யூல் இங்கு சேர்க்கப்பட்டுள்ளது ---
 SRCS = src/main.c \
@@ -28,8 +29,21 @@ $(TARGET): $(SRCS)
 	$(CC) $(SRCS) $(CFLAGS) $(LDFLAGS) -o $(TARGET)
 	@echo "BDH Pure Linux CLI Multiplexer Engine built successfully! 🚀"
 
+# --- Universal System Install Target (Global CLI Command) ---
+install: $(TARGET)
+	install -Dm755 $(TARGET) $(PREFIX)/bin/$(TARGET)
+	@echo "=================================================================="
+	@echo "🔥 BDH Engine installed globally to $(PREFIX)/bin/$(TARGET) !"
+	@echo "👉 Type 'bdh-engine' from ANY folder in your terminal to run!"
+	@echo "=================================================================="
+
+# --- Universal System Uninstall Target ---
+uninstall:
+	rm -f $(PREFIX)/bin/$(TARGET)
+	@echo "BDH Engine uninstalled from system successfully!"
+
 clean:
 	rm -f $(TARGET) *.o
 	@echo "Cleaned old builds successfully!"
 
-.PHONY: all clean
+.PHONY: all clean install uninstall
