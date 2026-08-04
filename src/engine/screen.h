@@ -1,4 +1,4 @@
-// src/engine/screen.h
+// src/engine/screen.h - BDH Virtual Screen Buffer Header (Updated)
 #ifndef BDH_SCREEN_H
 #define BDH_SCREEN_H
 
@@ -24,5 +24,8 @@ VirtualScreen* screen_create(int rows, int cols);
 void screen_destroy(VirtualScreen *screen);
 void screen_clear(VirtualScreen *screen);
 void screen_put_char(VirtualScreen *screen, int row, int col, char ch);
+
+// --- ADDED: செல் (Cell) மெமரியில் எழுத்து மற்றும் நிறத்தை (Foreground Color) ஒன்றாகப் பதிவு செய்யும் பங்க்ஷன் ---
+void screen_put_char_color(VirtualScreen *screen, int row, int col, char ch, int fg_color);
 
 #endif // BDH_SCREEN_H
