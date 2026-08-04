@@ -1,8 +1,12 @@
-// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (100% Updated & Complete)
+// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (Matrix Green Edition - 100% Complete)
 #include "panes.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// நிறங்களுக்கான குறியீடுகள்
+#define COLOR_GREEN  2   // ANSI Green (32 / Bright Green)
+#define COLOR_RESET  0   // Default Terminal Color
 
 FloatingWindow* window_create(int id, int x, int y, int width, int height, const char* title, int z_index) {
     FloatingWindow *win = (FloatingWindow*)malloc(sizeof(FloatingWindow));
@@ -13,7 +17,7 @@ FloatingWindow* window_create(int id, int x, int y, int width, int height, const
     win->height = height;
     win->z_index = z_index;
     
-    // z_index == 1 ஆக இருந்தால் மட்டுமே Active (Bug Fixed):
+    // z_index == 1 ஆக இருந்தால் மட்டுமே Active
     win->is_active = (z_index == 1) ? 1 : 0;
     
     win->cur_r = 0;
@@ -51,29 +55,32 @@ void window_scroll_up(FloatingWindow *win) {
     }
 }
 
+// 2. Aesthetic Modern UI Border Draw Function (Matrix Green Edition)
 void window_draw(VirtualScreen *scr, FloatingWindow *win) {
     int start_r = win->x;
     int end_r = win->x + win->height - 1;
     int start_c = win->y;
     int end_c = win->y + win->width - 1;
 
-    // 1. மூலைகள் & பார்டர்கள்
-    screen_put_char(scr, start_r, start_c, '+');
-    screen_put_char(scr, start_r, end_c, '+');
-    screen_put_char(scr, end_r, start_c, '+');
-    screen_put_char(scr, end_r, end_c, '+');
+    // 1. மூலைகள் (Clean Crisp Corners - GREEN)
+    screen_put_char_color(scr, start_r, start_c, '+', COLOR_GREEN);
+    screen_put_char_color(scr, start_r, end_c,   '+', COLOR_GREEN);
+    screen_put_char_color(scr, end_r, start_c,   '+', COLOR_GREEN);
+    screen_put_char_color(scr, end_r, end_c,     '+', COLOR_GREEN);
 
+    // 2. மேல் & கீழ் பார்டர் கோடுகள் (Top Bar 'Bold =' & Bottom Bar '-' - GREEN)
     for (int c = start_c + 1; c < end_c; c++) {
-        screen_put_char(scr, start_r, c, '-');
-        screen_put_char(scr, end_r, c, '-');
+        screen_put_char_color(scr, start_r, c, '=', COLOR_GREEN); // மேல் பார்டர் தடிமனாக
+        screen_put_char_color(scr, end_r, c, '-', COLOR_GREEN);   // கீழ் பார்டர் நேர்த்தியாக
     }
 
+    // 3. பக்கவாட்டு கோடுகள் (Vertical Side Borders - GREEN)
     for (int r = start_r + 1; r < end_r; r++) {
-        screen_put_char(scr, r, start_c, '|');
-        screen_put_char(scr, r, end_c, '|');
+        screen_put_char_color(scr, r, start_c, '|', COLOR_GREEN);
+        screen_put_char_color(scr, r, end_c,   '|', COLOR_GREEN);
     }
 
-    // 2. விண்டோவின் உள் எழுத்துக்களை (Backing Store Text) வரைதல்
+    // 4. விண்டோவின் உள் எழுத்துக்கள் (Window Text Content - Default Color)
     int inner_w = win->width - 2;
     int inner_h = win->height - 2;
     for (int r = 0; r < inner_h && r < WIN_MAX_ROWS; r++) {
@@ -82,18 +89,22 @@ void window_draw(VirtualScreen *scr, FloatingWindow *win) {
         }
     }
 
-    // 3. விண்டோ தலைப்பு (Title Bar) - இடது மேல் மூலையில் (Top-Left Corner) தெளிவாகக் காட்டுதல்!
-    int title_len = strlen(win->title);
-    int title_pos = start_c + 3; // இடதுபக்கம் 3-வது இடத்திலிருந்து தொடங்கும்
+    // 5. Modern UI Floating Title Badge (Green Border Badge!)
+    char badge[128];
+    snprintf(badge, sizeof(badge), " [  %s  ] ", win->title);
+    int badge_len = strlen(badge);
     
-    for (int i = 0; i < title_len && (title_pos + i) < end_c; i++) {
-        screen_put_char(scr, start_r, title_pos + i, win->title[i]);
+    // இடதுபுறம் 3 ஸ்பேஸ் தள்ளி அழகாகத் தொடங்கும்
+    int title_pos = start_c + 3; 
+
+    for (int i = 0; i < badge_len && (title_pos + i) < end_c; i++) {
+        screen_put_char_color(scr, start_r, title_pos + i, badge[i], COLOR_GREEN);
     }
 }
 
-// 2. முழுமையான window_put_char (Scrolling + Backspace + Tab '\t' ஆதரவுடன்)
+// 3. முழுமையான window_put_char (Scrolling + Backspace + Tab '\t' ஆதரவுடன்)
 void window_put_char(VirtualScreen *scr, FloatingWindow *win, char ch) {
-    (void)scr; // scr நேரடியாகத் தேவையில்லை எனில் compiler warning-ஐத் தவிர்க்க
+    (void)scr; 
     int inner_width = win->width - 2;
     int inner_height = win->height - 2;
 
@@ -113,7 +124,7 @@ void window_put_char(VirtualScreen *scr, FloatingWindow *win, char ch) {
         return;
     }
 
-    // --- ADDED: Tab (\t - ASCII 9) ஆதரவு ('ls' கமாண்டுக்கு மிக முக்கியம்!) ---
+    // Tab (\t - ASCII 9) ஆதரவு ('ls' கமாண்டுக்கு மிக முக்கியம்!)
     if (ch == '\t') {
         int next_tab = (win->cur_c + 8) & ~7; // 8-Space Tab Stop
         while (win->cur_c < next_tab && win->cur_c < inner_width) {
