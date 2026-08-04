@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - 100% Dynamic Multi-Tab Stress Test Ready)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Permanent Footer Session Manager)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
-    printf("\r\n[BDH Engine] Starting 50x220 Custom Mode (Dynamic Multiplexer + Full UI)...\r\n");
+    printf("\r\n[BDH Engine] Starting 50x220 Custom Mode (Permanent Footer Manager + Full UI)...\r\n");
 
     char *user_shell = getenv("SHELL");
     if (!user_shell || strlen(user_shell) == 0) {
@@ -96,9 +96,9 @@ int main(int argc, char *argv[]) {
     StatusBar *status_bar = statusbar_create();
     
     statusbar_set_mode(status_bar, "NORMAL");
-    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A/Click: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
+    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Click/Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
 
-    // --- DYNAMIC TAB NAMES GENERATOR (6 டேப் முதல் 50 டேப் வரை கிராஷ் ஆகாது!) ---
+    // --- DYNAMIC TAB NAMES GENERATOR ---
     char *tab_names[MAX_SESSIONS];
     char tab_name_buffers[MAX_SESSIONS][32];
 
@@ -109,9 +109,11 @@ int main(int argc, char *argv[]) {
 
     sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
+    // Initial Draw
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
     if (tab_bar) tabs_draw(scr, tab_bar, 0);
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+    if (tab_bar) render_tab_overlay(scr, tab_bar); // Permanent Footer Box
 
     fd_set read_fds;
     char buffer[16384];
@@ -160,12 +162,10 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // --- 1. MOUSE INTERCEPTOR (Dynamic Tab Width Calculation) ---
+                // --- MOUSE INTERCEPTOR ---
                 MouseEvent mouse;
                 if (mouse_parse_sgr(buffer, &mouse)) {
-                    // Top Tab Bar (row == 0) மீது Left Click செய்திருந்தால் Tab-ஐ மாற்ற வேண்டும்:
                     if (mouse.row == 0 && mouse.button == MOUSE_BTN_LEFT && !mouse.is_release) {
-                        // திரையின் அகலத்தை டேப் எண்ணிக்கையால் வகுத்து துல்லியமாக கணக்கிடுதல்:
                         int tab_width = scr_cols / MAX_SESSIONS;
                         if (tab_width < 1) tab_width = 1;
 
@@ -174,13 +174,11 @@ int main(int argc, char *argv[]) {
                         if (clicked_tab >= 0 && clicked_tab < MAX_SESSIONS && 
                             sessions[clicked_tab].is_alive && sessions[clicked_tab].win != NULL) {
                             
-                            // பழைய டேபை Inactive ஆக்குதல்
                             sessions[active_idx].win->z_index = 0;
                             sessions[active_idx].win->is_active = 0;
                             snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), 
                                      "[ TAB %d/%d : %s ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
 
-                            // கிளிக் செய்த டேபை Active ஆக்குதல்
                             active_idx = clicked_tab;
                             sessions[active_idx].win->z_index = 1;
                             sessions[active_idx].win->is_active = 1;
@@ -193,13 +191,14 @@ int main(int argc, char *argv[]) {
                             renderer_draw_all(scr, sessions, MAX_SESSIONS);
                             if (tab_bar) tabs_draw(scr, tab_bar, 0);
                             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+                            if (tab_bar) render_tab_overlay(scr, tab_bar); // Always Draw Footer Box
                             write(STDOUT_FILENO, "\033[?7h", 5);
                         }
                     }
                     continue; 
                 }
 
-                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch - 100% Crash Proof) ---
+                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch) ---
                 if (buffer[0] == 1) { 
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 0;
@@ -228,6 +227,7 @@ int main(int argc, char *argv[]) {
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         if (tab_bar) tabs_draw(scr, tab_bar, 0);
                         if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+                        if (tab_bar) render_tab_overlay(scr, tab_bar); // Always Draw Footer Box
                         write(STDOUT_FILENO, "\033[?7h", 5);
                     }
                     continue; 
@@ -337,11 +337,13 @@ int main(int argc, char *argv[]) {
             break;
         }
 
+        // --- RENDER LOOP WITH PERMANENT FOOTER BOX ---
         if (needs_render) {
             write(STDOUT_FILENO, "\033[?7l", 5); 
             renderer_draw_all(scr, sessions, MAX_SESSIONS);
             if (tab_bar) tabs_draw(scr, tab_bar, 0);
             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+            if (tab_bar) render_tab_overlay(scr, tab_bar); // Always rendered at footer
             write(STDOUT_FILENO, "\033[?7h", 5); 
         }
     }
