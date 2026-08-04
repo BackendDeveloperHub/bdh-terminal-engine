@@ -1,4 +1,4 @@
-// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser
+// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Arch Linux Fixed)
 #include "parser.h"
 #include <stdlib.h>
 
@@ -43,15 +43,19 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 parser->arg_count = 0;
                 parser->cur_val = 0;
                 for (int i = 0; i < 4; i++) parser->args[i] = 0;
-            } 
-            // 1. ESC c (\033c) - Full Terminal Reset / Clear Screen குறியீடு:
+            }
+            // 1. Arch Linux / Starship OSC Sequences (\033]...)
+            else if (ch == ']') {
+                parser->state = STATE_OSC;
+            }
+            // 2. ESC c (\033c) - Full Terminal Reset:
             else if (ch == 'c') {
                 clear_entire_window(win);
                 parser->state = STATE_NORMAL;
             }
-            // 2. Character Set Selection (\033( அல்லது \033)) & OSC Title Sequences - புறக்கணித்தல்:
-            else if (ch == '(' || ch == ')' || ch == ']' || ch == '=' || ch == '>') {
-                parser->state = STATE_NORMAL; // குப்பை எழுத்துக்கள் திரையில் வராது
+            // 3. Character Set Selection (\033( அல்லது \033)) - புறக்கணித்தல்:
+            else if (ch == '(' || ch == ')' || ch == '=' || ch == '>') {
+                parser->state = STATE_NORMAL;
             }
             else {
                 parser->state = STATE_NORMAL;
@@ -61,23 +65,27 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
             }
             break;
 
+        // --- ADDED: Arch Linux / Starship OSC Title Sequences-ஐப் பாதுகாப்பாக இக்னோர் செய்ய ---
+        case STATE_OSC:
+            // OSC குறியீடுகள் ASCII BEL (\007) அல்லது ESC \ (\033\\) உடன் முடிவடையும்:
+            if (ch == '\007' || ch == '\\') {
+                parser->state = STATE_NORMAL;
+            }
+            break;
+
         case STATE_CSI:
-            // '?' அல்லது மற்ற Private Mode எழுத்துக்களைப் புறக்கணித்தல்:
             if (ch == '?' || ch == '=' || ch == '>') {
                 break;
             }
-            // 1. எண்களைப் பிரித்தெடுத்தல் ('0'..'9')
             else if (ch >= '0' && ch <= '9') {
                 parser->cur_val = (parser->cur_val * 10) + (ch - '0');
             }
-            // 2. செமிகோலன் (';') வந்தால் அடுத்த ஆர்குமெண்ட்
             else if (ch == ';') {
                 if (parser->arg_count < 4) {
                     parser->args[parser->arg_count++] = parser->cur_val;
                 }
                 parser->cur_val = 0;
             }
-            // 3. குறியீடு முடிவடையும் எழுத்துக்கள் (@ முதல் ~ வரை)
             else if (ch >= 0x40 && ch <= 0x7E) {
                 if (parser->arg_count < 4) {
                     parser->args[parser->arg_count++] = parser->cur_val;
@@ -118,14 +126,52 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                     win->cur_r = row;
                     win->cur_c = col;
                 }
-                else if (ch == 'K') { // Erase Line
-                    for (int c = win->cur_c; c < inner_w && c < WIN_MAX_COLS; c++) {
-                        win->text[win->cur_r][c] = ' ';
+                // --- FIXED: Erase Line (\033[K, \033[2K) ---
+                else if (ch == 'K') {
+                    int mode = parser->args[0];
+                    if (mode == 0) { // Cursor to end of line
+                        for (int c = win->cur_c; c < inner_w && c < WIN_MAX_COLS; c++) {
+                            win->text[win->cur_r][c] = ' ';
+                        }
+                    } else if (mode == 1) { // Start of line to cursor
+                        for (int c = 0; c <= win->cur_c && c < inner_w && c < WIN_MAX_COLS; c++) {
+                            win->text[win->cur_r][c] = ' ';
+                        }
+                    } else if (mode == 2) { // Entire line (DO NOT MOVE CURSOR)
+                        for (int c = 0; c < inner_w && c < WIN_MAX_COLS; c++) {
+                            win->text[win->cur_r][c] = ' ';
+                        }
                     }
                 }
-                // CSI J (\033[J, \033[2J, \033[3J) - Clear Screen குறியீடுகள்:
+                // --- FIXED: Erase Display (\033[J, \033[2J) - Arch Linux Screen Wipe Bug Fixed ---
                 else if (ch == 'J') {
-                    clear_entire_window(win);
+                    int mode = parser->args[0];
+                    if (mode == 2 || mode == 3) {
+                        // \033[2J அல்லது \033[3J வந்தால் மட்டுமே முழு ஸ்கிரீனையும் துடைக்க வேண்டும்
+                        clear_entire_window(win);
+                    } 
+                    else if (mode == 0) {
+                        // \033[0J அல்லது \033[J - கர்சருக்கு கீழே உள்ள பகுதியை மட்டுமே துடைக்க வேண்டும் (Cursor-ஐ 0,0-க்கு மாற்றக்கூடாது!)
+                        for (int c = win->cur_c; c < inner_w && c < WIN_MAX_COLS; c++) {
+                            win->text[win->cur_r][c] = ' ';
+                        }
+                        for (int r = win->cur_r + 1; r < inner_h && r < WIN_MAX_ROWS; r++) {
+                            for (int c = 0; c < inner_w && c < WIN_MAX_COLS; c++) {
+                                win->text[r][c] = ' ';
+                            }
+                        }
+                    }
+                    else if (mode == 1) {
+                        // \033[1J - மேலே உள்ள பகுதியை மட்டும் துடைக்க வேண்டும்
+                        for (int r = 0; r < win->cur_r && r < WIN_MAX_ROWS; r++) {
+                            for (int c = 0; c < inner_w && c < WIN_MAX_COLS; c++) {
+                                win->text[r][c] = ' ';
+                            }
+                        }
+                        for (int c = 0; c <= win->cur_c && c < inner_w && c < WIN_MAX_COLS; c++) {
+                            win->text[win->cur_r][c] = ' ';
+                        }
+                    }
                 }
 
                 parser->state = STATE_NORMAL;
