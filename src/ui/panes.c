@@ -1,4 +1,4 @@
-// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (Matrix Green Edition - 100% Complete)
+// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (100% Responsive 2-Cell Margin Edition)
 #include "panes.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,14 +39,12 @@ void window_scroll_up(FloatingWindow *win) {
     int inner_height = win->height - 2;
     int inner_width  = win->width - 2;
 
-    // Row 1 முதல் கடைசி வரை உள்ள எழுத்துக்களை ஒரு வரி மேலே (Row 0-க்கு) நகர்த்துதல்:
     for (int r = 0; r < inner_height - 1 && r < WIN_MAX_ROWS - 1; r++) {
         for (int c = 0; c < inner_width && c < WIN_MAX_COLS; c++) {
             win->text[r][c] = win->text[r + 1][c];
         }
     }
 
-    // கடைசி வரியை (Bottom row) காலியாக்குதல் (Spaces):
     int last_r = inner_height - 1;
     if (last_r < WIN_MAX_ROWS) {
         for (int c = 0; c < inner_width && c < WIN_MAX_COLS; c++) {
@@ -55,12 +53,17 @@ void window_scroll_up(FloatingWindow *win) {
     }
 }
 
-// 2. Aesthetic Modern UI Border Draw Function (Matrix Green Edition)
+// 2. Responsive Border Draw Function (எந்த ஸ்கிரீன் சைஸாக இருந்தாலும் 4 பக்கமும் 2-எழுத்து Margin)
 void window_draw(VirtualScreen *scr, FloatingWindow *win) {
-    int start_r = win->x;
-    int end_r = win->x + win->height - 1;
-    int start_c = win->y;
-    int end_c = win->y + win->width - 1;
+    // --- RESPONSIVE CALCULATION: ஸ்கிரீனின் 4 பக்க விளிம்பிலிருந்தும் 2 வரிகள்/எழுத்துக்கள் உள்ளே தள்ளி பார்டர் அமையும் ---
+    int start_r = 1;                  // மேலே 1 வரி இடைவெளி
+    int end_r   = scr->rows - 2;      // கீழே 2 வரிகள் இடைவெளி
+    int start_c = 2;                  // இடதுபுறம் 2 எழுத்துக்கள் இடைவெளி
+    int end_c   = scr->cols - 3;      // வலதுபுறம் 2 எழுத்துக்கள் இடைவெளி
+
+    // பாதுகாப்பு அரண் (திரை மிகச் சிறிதாக இருந்தால் கிராஷ் ஆகாமல் இருக்க Safety Check):
+    if (end_r <= start_r + 2) end_r = scr->rows - 1;
+    if (end_c <= start_c + 2) end_c = scr->cols - 1;
 
     // 1. மூலைகள் (Clean Crisp Corners - GREEN)
     screen_put_char_color(scr, start_r, start_c, '+', COLOR_GREEN);
@@ -81,17 +84,17 @@ void window_draw(VirtualScreen *scr, FloatingWindow *win) {
     }
 
     // 4. விண்டோவின் உள் எழுத்துக்கள் (Window Text Content - Default Color)
-    int inner_w = win->width - 2;
-    int inner_h = win->height - 2;
+    int inner_w = (end_c - start_c - 1);
+    int inner_h = (end_r - start_r - 1);
     for (int r = 0; r < inner_h && r < WIN_MAX_ROWS; r++) {
         for (int c = 0; c < inner_w && c < WIN_MAX_COLS; c++) {
             screen_put_char(scr, start_r + 1 + r, start_c + 1 + c, win->text[r][c]);
         }
     }
 
-    // 5. Modern UI Floating Title Badge (Green Border Badge!)
+    // 5. Modern UI Floating Title Badge (Double Bracket Fixed!)
     char badge[128];
-    snprintf(badge, sizeof(badge), " [  %s  ] ", win->title);
+    snprintf(badge, sizeof(badge), "  %s  ", win->title); // <-- சிங்கிள் பிராக்கெட்டுடன் நேர்த்தியாக வரும்
     int badge_len = strlen(badge);
     
     // இடதுபுறம் 3 ஸ்பேஸ் தள்ளி அழகாகத் தொடங்கும்
