@@ -1,4 +1,4 @@
-// src/ui/tabs.c - BDH Terminal Engine Tab Bar UI & Overlay Manager Implementation
+// src/ui/tabs.c - BDH Terminal Engine Tab Bar UI & Footer Session Manager Implementation
 #include "tabs.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,7 +51,7 @@ void tabs_set_active(TabBar *bar, int index) {
     bar->active_idx = index;
 }
 
-// 4. வழக்கமான Tab Bar-ஐ திரையில் வரைதல்
+// 4. வழக்கமான Tab Bar-ஐ திரையில் வரைதல் (Top Header)
 void tabs_draw(VirtualScreen *scr, TabBar *bar, int row) {
     (void)scr;
     if (!bar) return;
@@ -69,39 +69,43 @@ void tabs_draw(VirtualScreen *scr, TabBar *bar, int row) {
     fflush(stdout);
 }
 
-// 5. --- ADDED: Tab Overlay Dashboard Renderer (Git-Status / Manager Style) ---
+// 5. --- UPDATED: Footer Active Sessions Manager Box Renderer ---
 void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
-    (void)scr;
-    if (!bar) return;
+    if (!bar || !scr) return;
 
-    int box_top = 5;
-    int box_w = DEFAULT_COLS - 1;
+    int box_top = scr->rows - 6; // திரையின் அடிபாகத்தில் பாக்ஸ் வர
+    int box_left = 2;
+    int box_w = scr->cols - 4;
 
-    // 1. Active Tab லேபிளை சிவப்பு நிறத்தில் காட்டுதல் (\033[31m)
-    printf("\033[%d;2H\033[31m[ BDH Active Sessions Overview ]\033[0m", box_top - 1);
+    if (box_top < 10) box_top = 10; // பாதுகாப்பு அரண்
 
-    // 2. அனைத்து டேப்களின் பட்டியலை மல்டி-லைனில் (Wrapped) பிரிண்ட் செய்தல்
-    int row = box_top + 2;
-    int col = 2;
+    // 1. பாக்ஸின் தலைப்பு பார்டர் (Top Border + Title)
+    printf("\033[%d;%dH\033[1;32m+--- [ BDH Active Sessions Manager ] ---------------------------------+\033[0m", box_top, box_left);
+
+    // 2. டேப்களின் நிலையை வரிசையாக (Wrapped List) காட்டுதல்
+    int row = box_top + 1;
+    int col = box_left + 2;
     
     for (int i = 0; i < bar->count; i++) {
         char buf[128];
         if (bar->tabs[i].is_active) {
-            // Active tab-ஐ Bold Green-ல் Highlight செய்ய: \033[1;32m
-            snprintf(buf, sizeof(buf), "\033[1;32m[%d- %s (ACTIVE)]\033[0m", i + 1, bar->tabs[i].title);
+            // Active tab-ஐ Green-ல் ஒளிரச் செய்தல்
+            snprintf(buf, sizeof(buf), "\033[1;32m[%d: %s (RUNNING)]\033[0m", i + 1, bar->tabs[i].title);
         } else {
-            snprintf(buf, sizeof(buf), "%d- %s", i + 1, bar->tabs[i].title);
+            snprintf(buf, sizeof(buf), "%d: %s", i + 1, bar->tabs[i].title);
         }
         
-        // டெர்மினல் கரஸ்பாண்டிங் பொசிஷனில் பிரிண்ட் செய்தல்
         printf("\033[%d;%dH%s", row, col, buf);
         
-        col += strlen(bar->tabs[i].title) + 10;
+        col += strlen(bar->tabs[i].title) + 12;
         if (col > box_w - 20) { 
-            col = 2; 
+            col = box_left + 2; 
             row++; 
         }
     }
+    
+    // 3. பாக்ஸின் கீழ் பார்டர் (Bottom Border)
+    printf("\033[%d;%dH\033[1;32m+--------------------------------------------------------------------+\033[0m", box_top + 4, box_left);
     fflush(stdout);
 }
 
