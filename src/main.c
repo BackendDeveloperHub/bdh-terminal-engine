@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Mouse & Keyboard Full Support)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - 100% Dynamic Multi-Tab Stress Test Ready)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
-    printf("\r\n[BDH Engine] Starting 50x220 Custom Mode (6-Tab Multiplexer + Full UI)...\r\n");
+    printf("\r\n[BDH Engine] Starting 50x220 Custom Mode (Dynamic Multiplexer + Full UI)...\r\n");
 
     char *user_shell = getenv("SHELL");
     if (!user_shell || strlen(user_shell) == 0) {
@@ -98,9 +98,14 @@ int main(int argc, char *argv[]) {
     statusbar_set_mode(status_bar, "NORMAL");
     statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A/Click: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
 
-    char *tab_names[MAX_SESSIONS] = {
-        "BASH-1", "BASH-2", "BASH-3", "BASH-4", "BASH-5", "BASH-6"
-    };
+    // --- DYNAMIC TAB NAMES GENERATOR (6 டேப் முதல் 50 டேப் வரை கிராஷ் ஆகாது!) ---
+    char *tab_names[MAX_SESSIONS];
+    char tab_name_buffers[MAX_SESSIONS][32];
+
+    for (int i = 0; i < MAX_SESSIONS; i++) {
+        snprintf(tab_name_buffers[i], sizeof(tab_name_buffers[i]), "BASH-%d", i + 1);
+        tab_names[i] = tab_name_buffers[i];
+    }
 
     sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
@@ -155,13 +160,16 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // --- 1. MOUSE INTERCEPTOR: மவுஸ் கிளிக் ஈவென்ட் சோதனை ---
+                // --- 1. MOUSE INTERCEPTOR (Dynamic Tab Width Calculation) ---
                 MouseEvent mouse;
                 if (mouse_parse_sgr(buffer, &mouse)) {
                     // Top Tab Bar (row == 0) மீது Left Click செய்திருந்தால் Tab-ஐ மாற்ற வேண்டும்:
                     if (mouse.row == 0 && mouse.button == MOUSE_BTN_LEFT && !mouse.is_release) {
-                        // 50x220 திரையில் ஒரு டேபின் அகலம் தோராயமாக 25 எழுத்துக்கள் எனில்:
-                        int clicked_tab = mouse.col / 25; 
+                        // திரையின் அகலத்தை டேப் எண்ணிக்கையால் வகுத்து துல்லியமாக கணக்கிடுதல்:
+                        int tab_width = scr_cols / MAX_SESSIONS;
+                        if (tab_width < 1) tab_width = 1;
+
+                        int clicked_tab = mouse.col / tab_width; 
                         
                         if (clicked_tab >= 0 && clicked_tab < MAX_SESSIONS && 
                             sessions[clicked_tab].is_alive && sessions[clicked_tab].win != NULL) {
@@ -188,7 +196,6 @@ int main(int argc, char *argv[]) {
                             write(STDOUT_FILENO, "\033[?7h", 5);
                         }
                     }
-                    // மவுஸ் ஈவென்ட்டை Shell-க்கு அனுப்பாமல் இங்கேயே முடித்துவிடுகிறோம்
                     continue; 
                 }
 
@@ -283,7 +290,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // --- 2. Shell Output & 6 Concurrent Sessions Parsing (Signal 11 Fixed) ---
+        // --- 2. Shell Output & Concurrent Sessions Parsing ---
         int needs_render = 0;
         int active_sessions_count = 0;
 
@@ -297,7 +304,6 @@ int main(int argc, char *argv[]) {
                 if (nread > 0) {
                     if (sessions[i].win != NULL && sessions[i].parser != NULL) {
                         for (int k = 0; k < nread; k++) {
-                            // --- FIX: NULL அனுப்பக்கூடாது! எப்போதும் scr அனுப்ப வேண்டும் (Signal 11 Fix) ---
                             parser_feed_char(sessions[i].parser, scr, sessions[i].win, buffer[k]);
                         }
                         if (i == active_idx) {
