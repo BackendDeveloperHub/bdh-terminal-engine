@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - Permanent Footer Session Manager)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - 12 Default / 18 Max Cap)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -24,6 +24,13 @@
 #include "engine/renderer.h"
 #include "engine/terminal.h"
 #include "engine/session.h"
+
+// --- 🔥 SESSION LIMIT CONFIGURATION (12 Default / 18 Maximum Cap) ---
+#ifndef MAX_SESSIONS
+#define MAX_SESSIONS 18
+#endif
+
+#define DEFAULT_SESSIONS 12
 
 static void fatal_signal_handler(int signo) {
     write(STDOUT_FILENO, "\033[?1049l", 8);
@@ -54,7 +61,7 @@ int main(int argc, char *argv[]) {
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
-    printf("\r\n[BDH Engine] Starting 50x220 Custom Mode (Permanent Footer Manager + Full UI)...\r\n");
+    printf("\r\n[BDH Engine] Starting 50x220 Custom Mode (12 Default / 18 Max Sessions)...\r\n");
 
     char *user_shell = getenv("SHELL");
     if (!user_shell || strlen(user_shell) == 0) {
@@ -98,7 +105,7 @@ int main(int argc, char *argv[]) {
     statusbar_set_mode(status_bar, "NORMAL");
     statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Click/Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
 
-    // --- DYNAMIC TAB NAMES GENERATOR ---
+    // --- DYNAMIC TAB NAMES GENERATOR (Capped at MAX_SESSIONS: 18) ---
     char *tab_names[MAX_SESSIONS];
     char tab_name_buffers[MAX_SESSIONS][32];
 
@@ -107,11 +114,12 @@ int main(int argc, char *argv[]) {
         tab_names[i] = tab_name_buffers[i];
     }
 
+    // 12 முதல் 18 செஷன்களை கச்சிతంగా இயக்கும் Session Initializer
     sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
-    // Initial Draw
+    // Initial Draw (Top Tab Bar commented out for clean Row 0 badge display)
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
-    if (tab_bar) tabs_draw(scr, tab_bar, 0);
+    // if (tab_bar) tabs_draw(scr, tab_bar, 0);
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
     if (tab_bar) render_tab_overlay(scr, tab_bar); // Permanent Footer Box
 
@@ -145,7 +153,7 @@ int main(int argc, char *argv[]) {
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
             if (nread > 0) {
-                buffer[nread] = '\0'; // 🔥 FIX 1: கட்டாயம் Null-Terminate செய்ய வேண்டும்!
+                buffer[nread] = '\0'; // கட்டாயம் Null-Terminate செய்ய வேண்டும்!
 
                 // --- SCANNER MODE CHECK ---
                 if (token_scanner && token_scanner->is_scanning_mode) {
@@ -164,7 +172,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // --- MOUSE INTERCEPTOR (Strict Check: \033[< உள்ளதா என மட்டும் பார்க்க வேண்டும்) ---
+                // --- MOUSE INTERCEPTOR ---
                 MouseEvent mouse;
                 if (strncmp(buffer, "\033[<", 3) == 0 && mouse_parse_sgr(buffer, &mouse)) {
                     if (mouse.row == 0 && mouse.button == MOUSE_BTN_LEFT && !mouse.is_release) {
@@ -191,7 +199,7 @@ int main(int argc, char *argv[]) {
 
                             write(STDOUT_FILENO, "\033[?7l", 5);
                             renderer_draw_all(scr, sessions, MAX_SESSIONS);
-                            if (tab_bar) tabs_draw(scr, tab_bar, 0);
+                            // if (tab_bar) tabs_draw(scr, tab_bar, 0);
                             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                             if (tab_bar) render_tab_overlay(scr, tab_bar);
                             write(STDOUT_FILENO, "\033[?7h", 5);
@@ -227,7 +235,7 @@ int main(int argc, char *argv[]) {
 
                         write(STDOUT_FILENO, "\033[?7l", 5);
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
-                        if (tab_bar) tabs_draw(scr, tab_bar, 0);
+                        // if (tab_bar) tabs_draw(scr, tab_bar, 0);
                         if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                         if (tab_bar) render_tab_overlay(scr, tab_bar);
                         write(STDOUT_FILENO, "\033[?7h", 5);
@@ -271,7 +279,7 @@ int main(int argc, char *argv[]) {
                     break;
                 }
 
-                // --- 🔥 FIX 2: DIRECT PTY PASSTHROUGH (எந்த தடையுமின்றி உள்ளே அனுப்பும் பகுதி) ---
+                // --- DIRECT PTY PASSTHROUGH ---
                 if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
                     write(sessions[active_idx].master_fd, buffer, nread);
                 }
@@ -329,7 +337,7 @@ int main(int argc, char *argv[]) {
         if (needs_render) {
             write(STDOUT_FILENO, "\033[?7l", 5); 
             renderer_draw_all(scr, sessions, MAX_SESSIONS);
-            if (tab_bar) tabs_draw(scr, tab_bar, 0);
+            // if (tab_bar) tabs_draw(scr, tab_bar, 0); // Top Tab Bar disabled
             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
             if (tab_bar) render_tab_overlay(scr, tab_bar); // Always rendered at footer
             write(STDOUT_FILENO, "\033[?7h", 5); 
