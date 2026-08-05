@@ -1,4 +1,4 @@
-// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (Top Tab Bar Removed + Title Badge Kept!)
+// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (Clean Top Row 0 + Title Badge Kept!)
 #include "panes.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +17,7 @@ FloatingWindow* window_create(int id, int x, int y, int width, int height, const
     win->height = height;
     win->z_index = z_index;
     
+    // z_index == 1 ஆக இருந்தால் மட்டுமே Active
     win->is_active = (z_index == 1) ? 1 : 0;
     
     win->cur_r = 0;
@@ -52,10 +53,10 @@ void window_scroll_up(FloatingWindow *win) {
     }
 }
 
-// 2. Full-Width & Clean Border Draw Function (Badge Kept + Top Row 0 Replaced!)
+// 2. Responsive Border Draw Function (Row 0 Border + Full Width + Title Badge Kept!)
 void window_draw(VirtualScreen *scr, FloatingWindow *win) {
-    // --- TOP BAR REMOVED & FULL WIDTH CALCULATION ---
-    int start_r = 0;                  // 🔥 Row 0-லேயே தொடங்கும்! (மேலே இருந்த 1: BASH-1..20 முழுமையாக நீக்கப்படும்)
+    // --- FULL WIDTH & SAFE VERTICAL MARGIN CALCULATION ---
+    int start_r = 0;                  // 🔥 Row 0-லேயே தொடங்கும்! (உச்சியில் எந்த காலி வரியும் இருக்காது)
     int end_r   = scr->rows - 6;      // கீழே உள்ள [ BDH Active Sessions Manager ] பாக்ஸுக்கு மேலே சரியாக முடியும்
     int start_c = 0;                  // இடதுபுறம் முழு அகலம் (0 Margin)
     int end_c   = scr->cols - 1;      // வலதுபுறம் முழு அகலம் (0 Margin)
@@ -70,7 +71,7 @@ void window_draw(VirtualScreen *scr, FloatingWindow *win) {
     screen_put_char_color(scr, end_r, start_c,   '+', COLOR_GREEN);
     screen_put_char_color(scr, end_r, end_c,     '+', COLOR_GREEN);
 
-    // 2. மேல் & கீழ் பார்டர் கோடுகள் (= மற்றும் -)
+    // 2. மேல் & கீழ் பார்டர் கோடுகள் (Top Bar 'Bold =' & Bottom Bar '-' - GREEN)
     for (int c = start_c + 1; c < end_c; c++) {
         screen_put_char_color(scr, start_r, c, '=', COLOR_GREEN); // மேல் பார்டர் தடிமனாக (=)
         screen_put_char_color(scr, end_r, c, '-', COLOR_GREEN);   // கீழ் பார்டர் நேர்த்தியாக (-)
