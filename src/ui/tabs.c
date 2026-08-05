@@ -60,13 +60,13 @@ void tabs_draw(VirtualScreen *scr, TabBar *bar, int row) {
     // Top Tab Bar display disabled as requested.
 }
 
-// 5. --- UPDATED: Full-Screen Footer Active Sessions Manager Box ---
+// 5. --- UPDATED: Full-Screen Footer Active Sessions Manager Box (18 Max Cap Safe) ---
 void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
     if (!bar || !scr) return;
 
     int box_top = scr->rows - 5; // திரையின் அடிபாகத்தில் பாக்ஸ் வர
-    int box_left = 1;            // 🔥 Column 1-ல் இருந்து முழு அகலத்திற்கும் தொடங்கும் (0 Margin)
-    int box_w = scr->cols;       // 🔥 திரையின் முழு அகலம் (Full Screen Cover)
+    int box_left = 1;            // Column 1-ல் இருந்து முழு அகலத்திற்கும் தொடங்கும் (0 Margin)
+    int box_w = scr->cols;       // திரையின் முழு அகலம் (Full Screen Cover)
 
     if (box_top < 10) box_top = 10; // பாதுகாப்பு அரண்
     if (box_w < 40) box_w = 40;
@@ -82,9 +82,18 @@ void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
     }
     printf("+\033[0m");
 
-    // --- 2. டேப்களின் நிலையை வரிசையாக (Full-Screen Wrapped List) காட்டுதல் ---
+    // --- 2. 🔥 GHOST TEXT FIX: பாக்ஸின் உள்ளே இருக்கும் 3 வரிகளையும் முதலில் சுத்தமாக அழித்தல் ---
+    for (int r = box_top + 1; r <= box_top + 3; r++) {
+        printf("\033[%d;%dH\033[1;32m|", r, box_left);
+        for (int c = 2; c < box_w; c++) {
+            putchar(' '); // காலி ஸ்பேஸ் நிரப்புதல்
+        }
+        printf("\033[%d;%dH|\033[0m", r, box_w);
+    }
+
+    // --- 3. டேப்களின் நிலையை வரிசையாக (Full-Screen Wrapped List - 18 Max safe) காட்டுதல் ---
     int row = box_top + 1;
-    int col = box_left + 2;
+    int col = box_left + 3; // இடது பார்டரிலிருந்து 2 ஸ்பேஸ் தள்ளி அழகாகத் தொடங்கும்
     
     for (int i = 0; i < bar->count; i++) {
         char buf[128];
@@ -97,15 +106,15 @@ void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
         
         printf("\033[%d;%dH%s", row, col, buf);
         
-        col += strlen(bar->tabs[i].title) + 14;
-        // வலதுபுற எல்லை வந்ததும் அடுத்த வரிக்குச் செல்ல (Responsive Wrap)
-        if (col > box_w - 18 && row < box_top + 3) { 
-            col = box_left + 2; 
+        col += strlen(bar->tabs[i].title) + 16;
+        // வலதுபுற எல்லை வந்ததும் அடுத்த வரிக்குச் செல்ல (Responsive Wrap for up to 18 tabs)
+        if (col > box_w - 20 && row < box_top + 3) { 
+            col = box_left + 3; 
             row++; 
         }
     }
     
-    // --- 3. Dynamic Full-Width Bottom Border (+---+ across entire screen) ---
+    // --- 4. Dynamic Full-Width Bottom Border (+---+ across entire screen) ---
     printf("\033[%d;%dH\033[1;32m+", box_top + 4, box_left);
     for (int c = 1; c < box_w - 1; c++) {
         putchar('-');
