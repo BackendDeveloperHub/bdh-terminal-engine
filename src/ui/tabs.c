@@ -51,38 +51,38 @@ void tabs_set_active(TabBar *bar, int index) {
     bar->active_idx = index;
 }
 
-// 4. வழக்கமான Tab Bar-ஐ திரையில் வரைதல் (Top Header)
+// 4. 🔥 TOP TAB BAR REMOVED COMPLETE FIX (No-Op Function)
+// இந்த பங்க்ஷன் காலி செய்யப்பட்டுள்ளது; எனவே உச்சியில் "1: BASH-1 2: BASH-2" இனி வரவே வராது!
 void tabs_draw(VirtualScreen *scr, TabBar *bar, int row) {
     (void)scr;
-    if (!bar) return;
-    
-    // Top Bar-ல் டேப்களின் பெயர்களை வரிசையாகக் காட்டுதல்
-    printf("\033[%d;1H\033[1;32m", row + 1); // Green Header Style
-    for (int i = 0; i < bar->count; i++) {
-        if (bar->tabs[i].is_active) {
-            printf(" [%d: %s*] ", i + 1, bar->tabs[i].title);
-        } else {
-            printf("  %d: %s  ", i + 1, bar->tabs[i].title);
-        }
-    }
-    printf("\033[0m"); // Reset color
-    fflush(stdout);
+    (void)bar;
+    (void)row;
+    // Top Tab Bar display disabled as requested.
 }
 
-// 5. --- UPDATED: Footer Active Sessions Manager Box Renderer ---
+// 5. --- UPDATED: Full-Screen Footer Active Sessions Manager Box ---
 void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
     if (!bar || !scr) return;
 
-    int box_top = scr->rows - 6; // திரையின் அடிபாகத்தில் பாக்ஸ் வர
-    int box_left = 2;
-    int box_w = scr->cols - 4;
+    int box_top = scr->rows - 5; // திரையின் அடிபாகத்தில் பாக்ஸ் வர
+    int box_left = 1;            // 🔥 Column 1-ல் இருந்து முழு அகலத்திற்கும் தொடங்கும் (0 Margin)
+    int box_w = scr->cols;       // 🔥 திரையின் முழு அகலம் (Full Screen Cover)
 
     if (box_top < 10) box_top = 10; // பாதுகாப்பு அரண்
+    if (box_w < 40) box_w = 40;
 
-    // 1. பாக்ஸின் தலைப்பு பார்டர் (Top Border + Title)
-    printf("\033[%d;%dH\033[1;32m+--- [ BDH Active Sessions Manager ] ---------------------------------+\033[0m", box_top, box_left);
+    // --- 1. Dynamic Full-Width Top Border (+=== [ BDH Active Sessions Manager ] ===+) ---
+    const char *title = "[ BDH Active Sessions Manager ]";
+    int title_len = strlen(title);
+    
+    printf("\033[%d;%dH\033[1;32m+== %s ", box_top, box_left, title);
+    int used_len = 4 + title_len + 1;
+    for (int c = used_len; c < box_w - 1; c++) {
+        putchar('=');
+    }
+    printf("+\033[0m");
 
-    // 2. டேப்களின் நிலையை வரிசையாக (Wrapped List) காட்டுதல்
+    // --- 2. டேப்களின் நிலையை வரிசையாக (Full-Screen Wrapped List) காட்டுதல் ---
     int row = box_top + 1;
     int col = box_left + 2;
     
@@ -97,15 +97,20 @@ void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
         
         printf("\033[%d;%dH%s", row, col, buf);
         
-        col += strlen(bar->tabs[i].title) + 12;
-        if (col > box_w - 20) { 
+        col += strlen(bar->tabs[i].title) + 14;
+        // வலதுபுற எல்லை வந்ததும் அடுத்த வரிக்குச் செல்ல (Responsive Wrap)
+        if (col > box_w - 18 && row < box_top + 3) { 
             col = box_left + 2; 
             row++; 
         }
     }
     
-    // 3. பாக்ஸின் கீழ் பார்டர் (Bottom Border)
-    printf("\033[%d;%dH\033[1;32m+--------------------------------------------------------------------+\033[0m", box_top + 4, box_left);
+    // --- 3. Dynamic Full-Width Bottom Border (+---+ across entire screen) ---
+    printf("\033[%d;%dH\033[1;32m+", box_top + 4, box_left);
+    for (int c = 1; c < box_w - 1; c++) {
+        putchar('-');
+    }
+    printf("+\033[0m");
     fflush(stdout);
 }
 
