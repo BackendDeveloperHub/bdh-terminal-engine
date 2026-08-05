@@ -141,11 +141,13 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        // --- 1. Keyboard & Mouse Input ---
+        // --- 1. Keyboard & Mouse Input (BULLETPROOF FIXED) ---
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
-            nread = read(STDIN_FILENO, buffer, sizeof(buffer));
+            nread = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
             if (nread > 0) {
-                
+                buffer[nread] = '\0'; // 🔥 FIX 1: கட்டாயம் Null-Terminate செய்ய வேண்டும்!
+
+                // --- SCANNER MODE CHECK ---
                 if (token_scanner && token_scanner->is_scanning_mode) {
                     if (buffer[0] >= '1' && buffer[0] <= '9') {
                         int token_id = buffer[0] - '0';
@@ -162,9 +164,9 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                // --- MOUSE INTERCEPTOR ---
+                // --- MOUSE INTERCEPTOR (Strict Check: \033[< உள்ளதா என மட்டும் பார்க்க வேண்டும்) ---
                 MouseEvent mouse;
-                if (mouse_parse_sgr(buffer, &mouse)) {
+                if (strncmp(buffer, "\033[<", 3) == 0 && mouse_parse_sgr(buffer, &mouse)) {
                     if (mouse.row == 0 && mouse.button == MOUSE_BTN_LEFT && !mouse.is_release) {
                         int tab_width = scr_cols / MAX_SESSIONS;
                         if (tab_width < 1) tab_width = 1;
@@ -191,15 +193,15 @@ int main(int argc, char *argv[]) {
                             renderer_draw_all(scr, sessions, MAX_SESSIONS);
                             if (tab_bar) tabs_draw(scr, tab_bar, 0);
                             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
-                            if (tab_bar) render_tab_overlay(scr, tab_bar); // Always Draw Footer Box
+                            if (tab_bar) render_tab_overlay(scr, tab_bar);
                             write(STDOUT_FILENO, "\033[?7h", 5);
                         }
                     }
                     continue; 
                 }
 
-                // --- SAFE INTERCEPTOR 1: Ctrl+A (Tab Switch) ---
-                if (buffer[0] == 1) { 
+                // --- SHORTCUT 1: Ctrl+A (Tab Switch) ---
+                if (buffer[0] == 1 && nread == 1) { 
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 0;
                         sessions[active_idx].win->is_active = 0;
@@ -227,30 +229,28 @@ int main(int argc, char *argv[]) {
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         if (tab_bar) tabs_draw(scr, tab_bar, 0);
                         if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
-                        if (tab_bar) render_tab_overlay(scr, tab_bar); // Always Draw Footer Box
+                        if (tab_bar) render_tab_overlay(scr, tab_bar);
                         write(STDOUT_FILENO, "\033[?7h", 5);
                     }
                     continue; 
                 }
 
-                // --- Interceptor 2: Ctrl+B (Browser) ---
-                if (buffer[0] == 2) {
+                // --- SHORTCUT 2: Ctrl+B (Browser) ---
+                if (buffer[0] == 2 && nread == 1) {
                     const char *target_url = getenv("BDH_URL");
                     if (!target_url || strlen(target_url) == 0) {
                         target_url = "https://github.com/BackendDeveloperHub";
                     }
-                    
                     char browser_cmd[512];
                     snprintf(browser_cmd, sizeof(browser_cmd), "links %s\n", target_url);
-                    
                     if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
                         write(sessions[active_idx].master_fd, browser_cmd, strlen(browser_cmd));
                     }
                     continue;
                 }
 
-                // --- Interceptor 3: Ctrl+K (Token Scanner) ---
-                if (buffer[0] == 11) { 
+                // --- SHORTCUT 3: Ctrl+K (Token Scanner) ---
+                if (buffer[0] == 11 && nread == 1) { 
                     int count = scanner_scan_screen(token_scanner, scr);
                     if (count > 0) {
                         token_scanner->is_scanning_mode = 1;
@@ -265,27 +265,15 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                InputAction action = input_parse_key(buffer[0], engine_cb, "ls -la /home\n");
+                // --- SHORTCUT 4: Ctrl+Q (Exit Engine Cleanly) ---
+                if (buffer[0] == 17 && nread == 1) {
+                    engine_running = 0;
+                    break;
+                }
 
-                switch (action) {
-                    case INPUT_ACTION_EXIT:
-                        engine_running = 0;
-                        break;
-
-                    case INPUT_ACTION_PASTE: {
-                        const char *paste_data = clipboard_get(engine_cb);
-                        if (strlen(paste_data) > 0 && sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
-                            write(sessions[active_idx].master_fd, paste_data, strlen(paste_data));
-                        }
-                        break;
-                    }
-
-                    case INPUT_ACTION_NORMAL:
-                    default:
-                        if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
-                            write(sessions[active_idx].master_fd, buffer, nread);
-                        }
-                        break;
+                // --- 🔥 FIX 2: DIRECT PTY PASSTHROUGH (எந்த தடையுமின்றி உள்ளே அனுப்பும் பகுதி) ---
+                if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
+                    write(sessions[active_idx].master_fd, buffer, nread);
                 }
             }
         }
