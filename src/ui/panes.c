@@ -1,4 +1,4 @@
-// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (4-Side -2 Margin Edition)
+// src/ui/panes.c - BDH Pure Linux CLI Multiplexer Windows & Panes (Top Tab Bar Removed + Title Badge Kept!)
 #include "panes.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,7 +17,6 @@ FloatingWindow* window_create(int id, int x, int y, int width, int height, const
     win->height = height;
     win->z_index = z_index;
     
-    // z_index == 1 ஆக இருந்தால் மட்டுமே Active
     win->is_active = (z_index == 1) ? 1 : 0;
     
     win->cur_r = 0;
@@ -53,16 +52,16 @@ void window_scroll_up(FloatingWindow *win) {
     }
 }
 
-// 2. Responsive Border Draw Function (4 பக்கமும் துல்லியமாக -2 Margin இடைவெளி)
+// 2. Full-Width & Clean Border Draw Function (Badge Kept + Top Row 0 Replaced!)
 void window_draw(VirtualScreen *scr, FloatingWindow *win) {
-    // --- 4-SIDE -2 MARGIN CALCULATION ---
-    int start_r = 2;                  // Top Border (-2 வரிகள் இடைவெளி)
-    int end_r   = scr->rows - 3;      // Footer/Bottom Border (-2 வரிகள் இடைவெளி)
-    int start_c = 2;                  // Left Side Border (-2 எழுத்துக்கள் இடைவெளி)
-    int end_c   = scr->cols - 3;      // Right Side Border (-2 எழுத்துக்கள் இடைவெளி)
+    // --- TOP BAR REMOVED & FULL WIDTH CALCULATION ---
+    int start_r = 0;                  // 🔥 Row 0-லேயே தொடங்கும்! (மேலே இருந்த 1: BASH-1..20 முழுமையாக நீக்கப்படும்)
+    int end_r   = scr->rows - 6;      // கீழே உள்ள [ BDH Active Sessions Manager ] பாக்ஸுக்கு மேலே சரியாக முடியும்
+    int start_c = 0;                  // இடதுபுறம் முழு அகலம் (0 Margin)
+    int end_c   = scr->cols - 1;      // வலதுபுறம் முழு அகலம் (0 Margin)
 
-    // பாதுகாப்பு அரண் (திரை மிகச் சிறிதாக இருந்தால் கிராஷ் ஆகாமல் இருக்க Safety Check):
-    if (end_r <= start_r + 2) end_r = scr->rows - 1;
+    // பாதுகாப்பு அரண் (Safety Check):
+    if (end_r <= start_r + 2) end_r = scr->rows - 2;
     if (end_c <= start_c + 2) end_c = scr->cols - 1;
 
     // 1. மூலைகள் (Clean Crisp Corners - GREEN)
@@ -71,10 +70,10 @@ void window_draw(VirtualScreen *scr, FloatingWindow *win) {
     screen_put_char_color(scr, end_r, start_c,   '+', COLOR_GREEN);
     screen_put_char_color(scr, end_r, end_c,     '+', COLOR_GREEN);
 
-    // 2. மேல் & கீழ் பார்டர் கோடுகள் (Top Bar 'Bold =' & Bottom Bar '-' - GREEN)
+    // 2. மேல் & கீழ் பார்டர் கோடுகள் (= மற்றும் -)
     for (int c = start_c + 1; c < end_c; c++) {
-        screen_put_char_color(scr, start_r, c, '=', COLOR_GREEN); // மேல் பார்டர் தடிமனாக
-        screen_put_char_color(scr, end_r, c, '-', COLOR_GREEN);   // கீழ் பார்டர் நேர்த்தியாக
+        screen_put_char_color(scr, start_r, c, '=', COLOR_GREEN); // மேல் பார்டர் தடிமனாக (=)
+        screen_put_char_color(scr, end_r, c, '-', COLOR_GREEN);   // கீழ் பார்டர் நேர்த்தியாக (-)
     }
 
     // 3. பக்கவாட்டு கோடுகள் (Vertical Side Borders - GREEN)
@@ -92,13 +91,11 @@ void window_draw(VirtualScreen *scr, FloatingWindow *win) {
         }
     }
 
-    // 5. Modern UI Floating Title Badge (Double Bracket Fixed!)
+    // 5. 🔥 நீங்கள் கேட்ட [ TAB 1/50 : BASH-1 (ACTIVE) * ] TITLE BADGE மாஸாக மீண்டும் சேர்க்கப்பட்டுள்ளது!
     char badge[128];
-    snprintf(badge, sizeof(badge), "  %s  ", win->title); // <-- சிங்கிள் பிராக்கெட்டுடன் நேர்த்தியாக வரும்
+    snprintf(badge, sizeof(badge), "  %s  ", win->title); 
     int badge_len = strlen(badge);
-    
-    // இடதுபுறம் 3 ஸ்பேஸ் தள்ளி அழகாகத் தொடங்கும்
-    int title_pos = start_c + 3; 
+    int title_pos = start_c + 3; // இடதுபுறம் 3 ஸ்பேஸ் தள்ளி அழகாகத் தொடங்கும்
 
     for (int i = 0; i < badge_len && (title_pos + i) < end_c; i++) {
         screen_put_char_color(scr, start_r, title_pos + i, badge[i], COLOR_GREEN);
