@@ -1,5 +1,6 @@
 # Makefile - BDH Pure Linux CLI Multiplexer Engine (Universal Edition)
-CC = gcc
+# --- FIX: Termux (clang) மற்றும் Arch Linux (gcc) இரண்டிற்கும் தானாகவே பொருந்த CC ?= gcc ---
+CC ?= gcc
 CFLAGS = -Iinclude -Isrc -D_GNU_SOURCE -Wall -Wextra
 LDFLAGS = -lutil
 PREFIX ?= /usr/local
