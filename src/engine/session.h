@@ -11,8 +11,8 @@
 #include "engine/scanner.h"
 #include "engine/clipboard.h"
 #include "engine/screen.h"
-#define MAX_SESSIONS 50
-#define NUM_SESSIONS 50
+#define MAX_SESSIONS 18
+#define NUM_SESSIONS 18
 
 typedef struct {
     int id;
