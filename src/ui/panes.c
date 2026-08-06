@@ -57,7 +57,7 @@ void window_scroll_up(FloatingWindow *win) {
 void window_draw(VirtualScreen *scr, FloatingWindow *win) {
     // --- FULL WIDTH & SAFE VERTICAL MARGIN CALCULATION ---
     int start_r = 1;                  // 🔥 Row 0-லேயே தொடங்கும்! (உச்சியில் எந்த காலி வரியும் இருக்காது)
-    int end_r   = scr->rows - 11;      // கீழே உள்ள [ BDH Active Sessions Manager ] பாக்ஸுக்கு மேலே சரியாக முடியும்
+    int end_r   = scr->rows - 12;      // கீழே உள்ள [ BDH Active Sessions Manager ] பாக்ஸுக்கு மேலே சரியாக முடியும்
     int start_c = 0;                  // இடதுபுறம் முழு அகலம் (0 Margin)
     int end_c   = scr->cols - 1;      // வலதுபுறம் முழு அகலம் (0 Margin)
 
