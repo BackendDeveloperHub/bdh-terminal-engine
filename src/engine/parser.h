@@ -9,7 +9,8 @@ typedef enum {
     STATE_NORMAL,
     STATE_ESC,
     STATE_CSI,
-    STATE_OSC   // <-- ADDED: Arch Linux / Starship OSC Title Sequences-ஐ கையாள
+    STATE_OSC,  // <-- ADDED: Arch Linux / Starship OSC Title Sequences-ஐ கையாள
+    STATE_CHARSET
 } ParserState;
 
 typedef struct {
