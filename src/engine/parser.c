@@ -2,10 +2,6 @@
 #include "parser.h"
 #include <stdlib.h>
 
-#ifndef STATE_CHARSET
-#define STATE_CHARSET 5
-#endif
-
 AnsiParser* parser_create(void) {
     AnsiParser *parser = (AnsiParser*)malloc(sizeof(AnsiParser));
     parser->state = STATE_NORMAL;
