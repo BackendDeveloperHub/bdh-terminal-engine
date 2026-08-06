@@ -1,4 +1,4 @@
-// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Nano & Charset Fixed)
+// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Nano & Vim 100% Fixed)
 #include "parser.h"
 #include <stdlib.h>
 
@@ -33,7 +33,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
             if (ch == '\033') { // Escape Byte (0x1B)
                 parser->state = STATE_ESC;
             } else {
-                // 🔥 NANO & VIM FIX: எல்லா சாதாரண எழுத்துக்களும், \r, \n அனைத்தும் window_put_char-க்கே செல்ல வேண்டும்!
+                // 🔥 \r, \n உட்பட எல்லா சாதாரண எழுத்துக்களும் window_put_char-க்கே செல்ல வேண்டும்!
                 window_put_char(scr, win, ch);
             }
             break;
@@ -54,23 +54,18 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 clear_entire_window(win);
                 parser->state = STATE_NORMAL;
             }
-            // 3. 🔥 NANO FIX: Character Set Selection (\033(B அல்லது \033)0 போன்றவை)
-            // STATE_NORMAL-க்கு செல்லாமல் STATE_CHARSET-க்கு செல்ல வேண்டும்!
+            // 3. Character Set Selection (\033(B போன்றவை) - புறக்கணித்தல்:
             else if (ch == '(' || ch == ')' || ch == '*' || ch == '+' || ch == '=' || ch == '>') {
-                parser->state = STATE_CHARSET;
+                parser->state = STATE_NORMAL;
+            }
+            // 4. 🔥 NANO FIX: DECSC/DECRC Cursor Save & Index கட்டளைகளை அமைதியாகக் கடக்க வேண்டும்!
+            else if (ch == '7' || ch == '8' || ch == 'D' || ch == 'M' || ch == 'E' || ch == 'H') {
+                parser->state = STATE_NORMAL;
             }
             else {
+                // 🔥 ZERO GARBAGE PRINTING: தெரியாத ESC குறியீடு வந்தால் அதை அச்சிடாமல் அமைதியாக கடக்க வேண்டும்!
                 parser->state = STATE_NORMAL;
-                if (ch != '\033') {
-                    window_put_char(scr, win, ch);
-                }
             }
-            break;
-
-        // --- 🔥 ADDED: Character Set எழுத்துக்களை ('B', '0', 'A', etc.) அச்சிடாமல் இக்னோர் செய்ய ---
-        case STATE_CHARSET:
-            // \033(B-ல் வரும் 'B' எழுத்து இங்கே விழுங்கப்பட்டுவிடும் (Zero Ghost Printing!)
-            parser->state = STATE_NORMAL;
             break;
 
         // --- Arch Linux / Starship OSC Title Sequences-ஐப் பாதுகாப்பாக இக்னோர் செய்ய ---
@@ -106,7 +101,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                     win->cur_r -= n;
                     if (win->cur_r < 0) win->cur_r = 0;
                 }
-                else if (ch == 'B') { // 🔥 Cursor Down (Nano Arrow & Enter Down Move Fix)
+                else if (ch == 'B') { // Cursor Down
                     win->cur_r += n;
                     if (win->cur_r >= inner_h) win->cur_r = inner_h - 1;
                 }
@@ -118,11 +113,18 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                     win->cur_c -= n;
                     if (win->cur_c < 0) win->cur_c = 0;
                 }
-                else if (ch == 'G') { // Horizontal Absolute
+                else if (ch == 'G') { // Horizontal Absolute (\033[colG)
                     int col = (parser->args[0] > 0) ? parser->args[0] - 1 : 0;
                     if (col < 0) col = 0;
                     if (col >= inner_w) col = inner_w - 1;
                     win->cur_c = col;
+                }
+                // 🔥 NANO & VIM FIX: Vertical Position Absolute (\033[rowd) சேர்க்கப்பட்டுள்ளது!
+                else if (ch == 'd') {
+                    int row = (parser->args[0] > 0) ? parser->args[0] - 1 : 0;
+                    if (row < 0) row = 0;
+                    if (row >= inner_h) row = inner_h - 1;
+                    win->cur_r = row;
                 }
                 else if (ch == 'H' || ch == 'f') { // Cursor Position (row;col)
                     int row = (parser->args[0] > 0) ? parser->args[0] - 1 : 0;
