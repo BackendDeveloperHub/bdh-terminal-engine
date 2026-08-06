@@ -1,4 +1,4 @@
-// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Arch Linux Fixed)
+// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Arch Linux & Nano Fixed)
 #include "parser.h"
 #include <stdlib.h>
 
@@ -32,7 +32,21 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
         case STATE_NORMAL:
             if (ch == '\033') { // Escape Byte (0x1B)
                 parser->state = STATE_ESC;
-            } else {
+            } 
+            // 🔥 NANO & VIM FIX: Carriage Return (\r) கர்சரை வரியின் தொடக்கத்திற்கு கொண்டு செல்லும்
+            else if (ch == '\r') {
+                win->cur_c = 0;
+            } 
+            // 🔥 NANO & VIM FIX: Newline (\n) கர்சரை அடுத்த வரிக்கு இறக்கும்
+            else if (ch == '\n') {
+                win->cur_r++;
+                if (win->cur_r >= inner_h) {
+                    win->cur_r = inner_h - 1;
+                    // (தேவைப்பட்டால் இங்கு scroll logic இயங்கும், window_put_char பார்த்துக்கொள்ளும்)
+                    window_put_char(scr, win, '\n');
+                }
+            } 
+            else {
                 window_put_char(scr, win, ch);
             }
             break;
@@ -65,7 +79,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
             }
             break;
 
-        // --- ADDED: Arch Linux / Starship OSC Title Sequences-ஐப் பாதுகாப்பாக இக்னோர் செய்ய ---
+        // --- Arch Linux / Starship OSC Title Sequences-ஐப் பாதுகாப்பாக இக்னோர் செய்ய ---
         case STATE_OSC:
             // OSC குறியீடுகள் ASCII BEL (\007) அல்லது ESC \ (\033\\) உடன் முடிவடையும்:
             if (ch == '\007' || ch == '\\') {
@@ -98,7 +112,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                     win->cur_r -= n;
                     if (win->cur_r < 0) win->cur_r = 0;
                 }
-                else if (ch == 'B') { // Cursor Down
+                else if (ch == 'B') { // 🔥 Cursor Down (Nano Enter & Arrow Key Fix)
                     win->cur_r += n;
                     if (win->cur_r >= inner_h) win->cur_r = inner_h - 1;
                 }
@@ -126,7 +140,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                     win->cur_r = row;
                     win->cur_c = col;
                 }
-                // --- FIXED: Erase Line (\033[K, \033[2K) ---
+                // --- Erase Line (\033[K, \033[2K) ---
                 else if (ch == 'K') {
                     int mode = parser->args[0];
                     if (mode == 0) { // Cursor to end of line
@@ -143,15 +157,13 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                         }
                     }
                 }
-                // --- FIXED: Erase Display (\033[J, \033[2J) - Arch Linux Screen Wipe Bug Fixed ---
+                // --- Erase Display (\033[J, \033[2J) - Arch Linux Screen Wipe Bug Fixed ---
                 else if (ch == 'J') {
                     int mode = parser->args[0];
                     if (mode == 2 || mode == 3) {
-                        // \033[2J அல்லது \033[3J வந்தால் மட்டுமே முழு ஸ்கிரீனையும் துடைக்க வேண்டும்
                         clear_entire_window(win);
                     } 
                     else if (mode == 0) {
-                        // \033[0J அல்லது \033[J - கர்சருக்கு கீழே உள்ள பகுதியை மட்டுமே துடைக்க வேண்டும் (Cursor-ஐ 0,0-க்கு மாற்றக்கூடாது!)
                         for (int c = win->cur_c; c < inner_w && c < WIN_MAX_COLS; c++) {
                             win->text[win->cur_r][c] = ' ';
                         }
@@ -162,7 +174,6 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                         }
                     }
                     else if (mode == 1) {
-                        // \033[1J - மேலே உள்ள பகுதியை மட்டும் துடைக்க வேண்டும்
                         for (int r = 0; r < win->cur_r && r < WIN_MAX_ROWS; r++) {
                             for (int c = 0; c < inner_w && c < WIN_MAX_COLS; c++) {
                                 win->text[r][c] = ' ';
