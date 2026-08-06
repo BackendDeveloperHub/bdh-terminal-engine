@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Zsh Edition - Dynamic Responsive Size - 12 Default / 18 Max Cap)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Zsh & Built-in Editor Edition - 12 Default / 18 Max Cap)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -24,6 +24,7 @@
 #include "engine/renderer.h"
 #include "engine/terminal.h"
 #include "engine/session.h"
+#include "editor/edit.h" // 🔥 BDH Custom Built-in CLI Editor Header
 
 // --- 🔥 SESSION LIMIT CONFIGURATION (12 Default / 18 Maximum Cap) ---
 #ifndef MAX_SESSIONS
@@ -81,7 +82,7 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
     int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
-    // 🔥 NANO MULTI-LINE FIX: கீழே 12 வரிகள் Footer Box இருப்பதால் PTY உயரத்தை சரியாகக் கழிக்க வேண்டும்
+    // 🔥 NANO / BDH-EDIT MULTI-LINE FIX: கீழே 12 வரிகள் Footer Box இருப்பதால் PTY உயரத்தை சரியாகக் கழிக்க வேண்டும்
     int pty_rows = scr_rows - 13;
     int pty_cols = scr_cols - 2;
 
@@ -103,8 +104,11 @@ int main(int argc, char *argv[]) {
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
     
+    // 🔥 BDH BUILT-IN TEXT EDITOR INITIALIZATION:
+    EditorState *bdh_editor = editor_create();
+    
     statusbar_set_mode(status_bar, "NORMAL");
-    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Click/Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
+    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+E: Edit | Ctrl+K: Scan");
 
     // --- 🔥 DYNAMIC TAB NAMES GENERATOR (ZSH Edition - Capped at MAX_SESSIONS: 18) ---
     char *tab_names[MAX_SESSIONS];
@@ -118,9 +122,8 @@ int main(int argc, char *argv[]) {
     // 12 முதல் 18 செஷன்களை கச்சிతంగా இயக்கும் Session Initializer
     sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
-    // Initial Draw (Top Tab Bar commented out for clean Row 0 badge display)
+    // Initial Draw
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
-    // if (tab_bar) tabs_draw(scr, tab_bar, 0);
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
     if (tab_bar) render_tab_overlay(scr, tab_bar); // Permanent Footer Box
 
@@ -129,6 +132,7 @@ int main(int argc, char *argv[]) {
     ssize_t nread;
     int max_fd = 0;
     int engine_running = 1;
+    int needs_render = 0;
 
     while (engine_running) {
         FD_ZERO(&read_fds);
@@ -150,11 +154,49 @@ int main(int argc, char *argv[]) {
             break;
         }
 
+        needs_render = 0;
+
         // --- 1. Keyboard & Mouse Input (BULLETPROOF FIXED) ---
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
             if (nread > 0) {
                 buffer[nread] = '\0'; // கட்டாயம் Null-Terminate செய்ய வேண்டும்!
+
+                // --- SHORTCUT: Ctrl + E (Built-in Editor Mode ஆன்/ஆஃப் செய்தல்) ---
+                if (buffer[0] == 5 && nread == 1) { // Ctrl + E = 0x05
+                    if (bdh_editor && !bdh_editor->is_active) {
+                        editor_open(bdh_editor, "bdh_note.txt");
+                        bdh_editor->is_active = 1;
+                        if (status_bar) statusbar_set_mode(status_bar, "EDITOR");
+                    } else if (bdh_editor) {
+                        bdh_editor->is_active = 0;
+                        if (status_bar) statusbar_set_mode(status_bar, "NORMAL");
+                    }
+                    needs_render = 1;
+                    goto render_check;
+                }
+
+                // --- 🔥 EDITOR MODE ACTIVE: உள்ளீடுகளை BDH Edit-க்கு மட்டுமே அனுப்புதல் ---
+                if (bdh_editor && bdh_editor->is_active) {
+                    if (buffer[0] == 19 && nread == 1) { // Ctrl + S = Save File
+                        if (editor_save(bdh_editor)) {
+                            if (status_bar) statusbar_set_text(status_bar, "[ Saved Successfully! ]", "BDH Edit");
+                        }
+                        needs_render = 1;
+                        goto render_check;
+                    }
+                    if (buffer[0] == 24 && nread == 1) { // Ctrl + X = Close Editor & Return to Shell
+                        bdh_editor->is_active = 0;
+                        if (status_bar) statusbar_set_mode(status_bar, "NORMAL");
+                        needs_render = 1;
+                        goto render_check;
+                    }
+
+                    // Arrow keys, typing, backspace அனைத்தும் BDH Edit-க்குள் செல்லும்:
+                    editor_handle_key(bdh_editor, buffer, nread);
+                    needs_render = 1;
+                    goto render_check; // PTY Shell-க்கு எழுத்துக்கள் செல்லாமல் தடுக்கப்படுகிறது!
+                }
 
                 // --- SCANNER MODE CHECK ---
                 if (token_scanner && token_scanner->is_scanning_mode) {
@@ -200,7 +242,6 @@ int main(int argc, char *argv[]) {
 
                             write(STDOUT_FILENO, "\033[?7l", 5);
                             renderer_draw_all(scr, sessions, MAX_SESSIONS);
-                            // if (tab_bar) tabs_draw(scr, tab_bar, 0);
                             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                             if (tab_bar) render_tab_overlay(scr, tab_bar);
                             write(STDOUT_FILENO, "\033[?7h", 5);
@@ -236,7 +277,6 @@ int main(int argc, char *argv[]) {
 
                         write(STDOUT_FILENO, "\033[?7l", 5);
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
-                        // if (tab_bar) tabs_draw(scr, tab_bar, 0);
                         if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                         if (tab_bar) render_tab_overlay(scr, tab_bar);
                         write(STDOUT_FILENO, "\033[?7h", 5);
@@ -288,7 +328,6 @@ int main(int argc, char *argv[]) {
         }
 
         // --- 2. Shell Output & Concurrent Sessions Parsing ---
-        int needs_render = 0;
         int active_sessions_count = 0;
 
         for (int i = 0; i < MAX_SESSIONS; i++) {
@@ -334,17 +373,29 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        // --- RENDER LOOP WITH PERMANENT FOOTER BOX ---
+render_check:
+        // --- 🔥 RENDER LOOP WITH PERMANENT FOOTER & BDH EDIT SUPPORT ---
         if (needs_render) {
             write(STDOUT_FILENO, "\033[?7l", 5); 
-            renderer_draw_all(scr, sessions, MAX_SESSIONS);
-            // if (tab_bar) tabs_draw(scr, tab_bar, 0); // Top Tab Bar disabled
+            
+            if (bdh_editor && bdh_editor->is_active) {
+                // 🔥 Editor Mode ஆன்-ல் இருந்தால் BDH Edit திரையில் வரையப்படும்:
+                editor_draw(bdh_editor, scr, scr_rows, scr_cols);
+            } else {
+                // Shell Mode-ல் இருந்தால் வழக்கமான டெர்மினல் வரையப்படும்:
+                renderer_draw_all(scr, sessions, MAX_SESSIONS);
+            }
+
             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
-            if (tab_bar) render_tab_overlay(scr, tab_bar); // Always rendered at footer
+            if (tab_bar) render_tab_overlay(scr, tab_bar); // Footer எப்பொழுதும் பாதுகாப்பாக இருக்கும்!
             write(STDOUT_FILENO, "\033[?7h", 5); 
         }
     }
 
+    // --- CLEANUP ---
+    if (bdh_editor) {
+        editor_destroy(bdh_editor);
+    }
     sessions_cleanup_all(sessions, tab_bar, status_bar, token_scanner, engine_cb, scr);
 
     write(STDOUT_FILENO, "\033[?1049l", 8);
