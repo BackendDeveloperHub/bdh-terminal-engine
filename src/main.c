@@ -81,7 +81,8 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
     int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
-    int pty_rows = scr_rows - 2;
+    // 🔥 NANO MULTI-LINE FIX: கீழே 12 வரிகள் Footer Box இருப்பதால் PTY உயரத்தை சரியாகக் கழிக்க வேண்டும்
+    int pty_rows = scr_rows - 13;
     int pty_cols = scr_cols - 2;
 
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
@@ -110,7 +111,7 @@ int main(int argc, char *argv[]) {
     char tab_name_buffers[MAX_SESSIONS][32];
 
     for (int i = 0; i < MAX_SESSIONS; i++) {
-        snprintf(tab_name_buffers[i], sizeof(tab_name_buffers[i]), "ZSH-%d", i + 1); // BASH-க்கு பதிலாக ZSH
+        snprintf(tab_name_buffers[i], sizeof(tab_name_buffers[i]), "ZSH-%d", i + 1);
         tab_names[i] = tab_name_buffers[i];
     }
 
