@@ -18,4 +18,7 @@ typedef struct {
     int is_release;// 1 = released, 0 = pressed
 } MouseEvent;
 
+// --- SGR Mouse Parser Function Declaration ---
+int mouse_parse_sgr(const char *buf, MouseEvent *event);
+
 #endif // BDH_MOUSE_H
