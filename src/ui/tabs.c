@@ -52,7 +52,6 @@ void tabs_set_active(TabBar *bar, int index) {
 }
 
 // 4. 🔥 TOP TAB BAR REMOVED COMPLETE FIX (No-Op Function)
-// இந்த பங்க்ஷன் காலி செய்யப்பட்டுள்ளது; எனவே உச்சியில் "1: BASH-1 2: BASH-2" இனி வரவே வராது!
 void tabs_draw(VirtualScreen *scr, TabBar *bar, int row) {
     (void)scr;
     (void)bar;
@@ -60,17 +59,17 @@ void tabs_draw(VirtualScreen *scr, TabBar *bar, int row) {
     // Top Tab Bar display disabled as requested.
 }
 
-// 5. --- UPDATED: Full-Screen Footer Active Sessions Manager Box (18 Max Cap Safe) ---
+// 5. --- UPDATED: Full-Screen Footer Active Sessions Manager Box (-12 to -1 Complete Cover) ---
 void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
     if (!bar || !scr) return;
 
-    int box_top = scr->rows - 12; // திரையின் அடிபாகத்தில் பாக்ஸ் வர
-    int box_bottom = scr->rows - 1;
-    int box_left = 1;            // Column 1-ல் இருந்து முழு அகலத்திற்கும் தொடங்கும் (0 Margin)
-    int box_w = scr->cols;       // திரையின் முழு அகலம் (Full Screen Cover)
+    int box_top    = scr->rows - 12; // 🔥 திரையின் அடிபாகத்தில் பாக்ஸ் தொடங்கும் இடம் (-12)
+    int box_bottom = scr->rows - 1;  // 🔥 திரையின் கடைசி வரியில் கீழ் பார்டர் முடியும் இடம் (-1)
+    int box_left   = 1;              // Column 1-ல் இருந்து முழு அகலத்திற்கும் தொடங்கும் (0 Margin)
+    int box_w      = scr->cols;      // திரையின் முழு அகலம் (Full Screen Cover)
 
-    if (box_top < 10) box_top = 10; // பாதுகாப்பு அரண்
-    if (box_w < 40) box_w = 40;
+    if (box_top < 10) box_top = 10;  // பாதுகாப்பு அரண்
+    if (box_w < 40)   box_w = 40;
 
     // --- 1. Dynamic Full-Width Top Border (+=== [ BDH Active Sessions Manager ] ===+) ---
     const char *title = "[ BDH Active Sessions Manager ]";
@@ -83,8 +82,8 @@ void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
     }
     printf("+\033[0m");
 
-    // --- 2. 🔥 GHOST TEXT FIX: பாக்ஸின் உள்ளே இருக்கும் 3 வரிகளையும் முதலில் சுத்தமாக அழித்தல் ---
-    for (int r = box_top + 1; r <= box_top + 3; r++) {
+    // --- 2. 🔥 GHOST TEXT FIX: பாக்ஸின் உள்ளே இருக்கும் எல்லா வரிகளையும் சுத்தமாக அழித்தல் ---
+    for (int r = box_top + 1; r < box_bottom; r++) { // 🔥 box_top+3 க்கு பதிலாக box_bottom வரை சுத்தம் செய்கிறது!
         printf("\033[%d;%dH\033[1;32m|", r, box_left);
         for (int c = 2; c < box_w; c++) {
             putchar(' '); // காலி ஸ்பேஸ் நிரப்புதல்
@@ -109,14 +108,14 @@ void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
         
         col += strlen(bar->tabs[i].title) + 16;
         // வலதுபுற எல்லை வந்ததும் அடுத்த வரிக்குச் செல்ல (Responsive Wrap for up to 18 tabs)
-        if (col > box_w - 20 && row < box_top + 3) { 
+        if (col > box_w - 20 && row < box_bottom - 1) { // 🔥 box_bottom-க்கு மேல் உள்ள வரிகள் வரை இறங்கும்
             col = box_left + 3; 
             row++; 
         }
     }
     
-    // --- 4. Dynamic Full-Width Bottom Border (+---+ across entire screen) ---
-    printf("\033[%d;%dH\033[1;32m+", box_top + 4, box_left);
+    // --- 4. 🔥 Dynamic Full-Width Bottom Border (+---+ across entire screen at FOOTER -1) ---
+    printf("\033[%d;%dH\033[1;32m+", box_bottom, box_left); // 🔥 box_top+4 க்கு பதிலாக box_bottom (-1) வரியில் வரையும்!
     for (int c = 1; c < box_w - 1; c++) {
         putchar('-');
     }
