@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (50x220 Production Build - 12 Default / 18 Max Cap)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Zsh Edition - Dynamic Responsive Size - 12 Default / 18 Max Cap)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -61,11 +61,11 @@ int main(int argc, char *argv[]) {
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
-    printf("\r\n[BDH Engine] Starting 50x220 Custom Mode (12 Default / 18 Max Sessions)...\r\n");
+    printf("\r\n[BDH Engine] Starting Responsive Custom Mode (Zsh Edition - 12 Default / 18 Max Sessions)...\r\n");
 
     char *user_shell = getenv("SHELL");
     if (!user_shell || strlen(user_shell) == 0) {
-        user_shell = "/bin/bash";
+        user_shell = "/bin/zsh"; // 🔥 Bash-க்கு பதிலாக Zsh டீஃபால்ட்டாக அமைக்கப்பட்டுள்ளது!
     }
     char *shell_argv[] = {user_shell, NULL};
 
@@ -77,9 +77,8 @@ int main(int argc, char *argv[]) {
         ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
     }
     
-    // --- FORCE 50 Rows x 220 Columns Layout ---
-     
-    int scr_rows =(ws.ws_row > 10) ? ws.ws_row : 24;
+    // --- 🔥 DYNAMIC TERMINAL SIZE (Auto-Responsive Layout) ---
+    int scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
     int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
     int pty_rows = scr_rows - 2;
@@ -96,7 +95,7 @@ int main(int argc, char *argv[]) {
     int active_idx = 0;
 
     Clipboard *engine_cb = clipboard_create();
-    const char *default_cmd = "echo BDH 50x220 Multiplexer Active!\n";
+    const char *default_cmd = "echo BDH Zsh Multiplexer Active!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
     TokenScanner *token_scanner = scanner_create();
@@ -106,12 +105,12 @@ int main(int argc, char *argv[]) {
     statusbar_set_mode(status_bar, "NORMAL");
     statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Click/Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
 
-    // --- DYNAMIC TAB NAMES GENERATOR (Capped at MAX_SESSIONS: 18) ---
+    // --- 🔥 DYNAMIC TAB NAMES GENERATOR (ZSH Edition - Capped at MAX_SESSIONS: 18) ---
     char *tab_names[MAX_SESSIONS];
     char tab_name_buffers[MAX_SESSIONS][32];
 
     for (int i = 0; i < MAX_SESSIONS; i++) {
-        snprintf(tab_name_buffers[i], sizeof(tab_name_buffers[i]), "BASH-%d", i + 1);
+        snprintf(tab_name_buffers[i], sizeof(tab_name_buffers[i]), "ZSH-%d", i + 1); // BASH-க்கு பதிலாக ZSH
         tab_names[i] = tab_name_buffers[i];
     }
 
