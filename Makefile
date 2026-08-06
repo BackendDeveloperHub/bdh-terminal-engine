@@ -21,7 +21,8 @@ SRCS = src/main.c \
        src/engine/cursor.c \
        src/engine/input.c \
        src/engine/renderer.c \
-       src/engine/terminal.c
+       src/engine/terminal.c \
+       src/editor/edit.c 
 
 TARGET = bdh-engine
 
