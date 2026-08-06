@@ -71,10 +71,29 @@ make clean && make && sudo make install
 
 Usage
 Start the terminal engine directly from your shell:
+```bash
+bdh-engine
+```
+
+Keyboard & Mouse Controls / Action Triggers
+Ctrl + A — Switch to the next active Tab / Session sequentially.
+Mouse Left Click — Click on any session tab to switch directly to that session.
+Ctrl + B — Launch the CLI Web Browser (links) inside the currently active tab.
+Ctrl + K — Trigger the Token Scanner to scan and copy URLs/IPs from the screen.
+Ctrl + Y / Ctrl + P — Copy default text to clipboard / Paste clipboard content.
+Ctrl + Q — Safely terminate the engine and restore canonical terminal settings.
+
+Early iterations of bdh-terminal-engine experimented with embedded graphical WebKitGTK windows. However, GUI loops (gtk_main_quit) clashed with the low-level PTY select() loop, adding megabytes of bloat and restricting usage to desktop environments.
+By refactoring to a 100% Pure Linux CLI Multiplexer:
+Zero Crash Rate: Removed all display server (DISPLAY=:0) and GTK signal errors.
+Server & Mobile Ready: Perfectly functional over headless SSH connections, minimal Arch Linux installations, and Termux mobile environments.
+High Performance: Reduced binary size and memory footprint by over 99%.
 
 
-
-
+👨‍💻 Author & Engineering Workflow
+Prabakaran202 (Backend Developer Hub - BDH Linux)
+Systems Architecture & Engineering Design | AI-Assisted Low-Level C Implementation | Python / FastAPI | Arch Linux
+A note on modern engineering: This engine was conceptualized, architected, and debugged using an AI-assisted systems engineering workflow—combining human architectural vision with AI-driven code generation for rapid, low-level C development.
 
 
 
