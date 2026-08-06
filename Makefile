@@ -10,6 +10,7 @@ SRCS = src/main.c \
        src/engine/pty.c \
        src/engine/screen.c \
        src/engine/session.c \
+       src/engine/mouse.c \
        src/ui/panes.c \
        src/ui/wm.c \
        src/ui/tabs.c \
