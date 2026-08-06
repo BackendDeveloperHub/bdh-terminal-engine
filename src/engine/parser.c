@@ -1,6 +1,10 @@
-// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Zero Error Fixed)
+// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Zero-Glitch Typing Fixed)
 #include "parser.h"
 #include <stdlib.h>
+
+#ifndef STATE_CHARSET
+#define STATE_CHARSET 5
+#endif
 
 AnsiParser* parser_create(void) {
     AnsiParser *parser = (AnsiParser*)malloc(sizeof(AnsiParser));
@@ -24,7 +28,6 @@ static void clear_entire_window(FloatingWindow *win) {
     win->cur_c = 0;
 }
 
-// 1. 🔥 RENAMED: panes.h-உடன் மோதாமல் இருக்க parser_scroll_up என மாற்றப்பட்டுள்ளது:
 static void parser_scroll_up(FloatingWindow *win, int n) {
     int inner_w = win->width - 2;
     int inner_h = win->height - 2;
@@ -45,7 +48,6 @@ static void parser_scroll_up(FloatingWindow *win, int n) {
     }
 }
 
-// 2. 🔥 RENAMED: panes.h-உடன் மோதாமல் இருக்க parser_scroll_down என மாற்றப்பட்டுள்ளது:
 static void parser_scroll_down(FloatingWindow *win, int n) {
     int inner_w = win->width - 2;
     int inner_h = win->height - 2;
@@ -66,7 +68,6 @@ static void parser_scroll_down(FloatingWindow *win, int n) {
     }
 }
 
-// 3. DELETE LINES (\033[M): Nano/Vim-ல் வரிகளை மேலே இழுக்க உதவும் முக்கிய பங்க்ஷன்:
 static void delete_lines(FloatingWindow *win, int n) {
     int inner_w = win->width - 2;
     int inner_h = win->height - 2;
@@ -84,7 +85,6 @@ static void delete_lines(FloatingWindow *win, int n) {
     }
 }
 
-// 4. INSERT LINES (\033[L): Nano/Vim-ல் புதிய வரிகளை செருக உதவும் முக்கிய பங்க்ஷன்:
 static void insert_lines(FloatingWindow *win, int n) {
     int inner_w = win->width - 2;
     int inner_h = win->height - 2;
@@ -108,7 +108,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
 
     switch (parser->state) {
         case STATE_NORMAL:
-            if (ch == '\033') {
+            if (ch == '\033') { // Escape Byte (0x1B)
                 parser->state = STATE_ESC;
             } 
             else if (ch == '\r') {
@@ -121,7 +121,19 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                     win->cur_r = inner_h - 1;
                 }
             } 
-            else {
+            // 🔥 1. BACKSPACE FIX (\b அல்லது 0x08): கர்சரை ஒரு இடம் இடதுபுறம் நகர்த்த வேண்டும் (Glitch வராது!)
+            else if (ch == '\b' || ch == 0x08) {
+                if (win->cur_c > 0) {
+                    win->cur_c--;
+                }
+            }
+            // 🔥 2. TAB FIX (\t அல்லது 0x09): 8 ஸ்பேஸ் தள்ளி Tab Stop-ல் அமர்த்த வேண்டும்
+            else if (ch == '\t') {
+                win->cur_c = (win->cur_c + 8) & ~7;
+                if (win->cur_c >= inner_w) win->cur_c = inner_w - 1;
+            }
+            // 🔥 3. ZERO-GLITCH GOLDEN RULE: அச்சிடக்கூடிய எழுத்துக்கள் (>= 32 மற்றும் != 127 DEL) மட்டுமே திரைக்குச் செல்லும்!
+            else if ((unsigned char)ch >= 32 && ch != 127) {
                 window_put_char(scr, win, ch);
             }
             break;
