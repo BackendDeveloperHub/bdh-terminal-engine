@@ -78,7 +78,7 @@ void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
     printf("\033[%d;%dH\033[1;32m+== %s ", box_top, box_left, title);
     int used_len = 4 + title_len + 1;
     for (int c = used_len; c < box_w - 1; c++) {
-        putchar('='); and 
+        putchar('=');
     }
     printf("+\033[0m");
 
