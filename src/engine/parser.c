@@ -1,4 +1,4 @@
-// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Arch Linux & Nano Fixed)
+// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Nano & Charset Fixed)
 #include "parser.h"
 #include <stdlib.h>
 
@@ -32,21 +32,8 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
         case STATE_NORMAL:
             if (ch == '\033') { // Escape Byte (0x1B)
                 parser->state = STATE_ESC;
-            } 
-            // 🔥 NANO & VIM FIX: Carriage Return (\r) கர்சரை வரியின் தொடக்கத்திற்கு கொண்டு செல்லும்
-            else if (ch == '\r') {
-                win->cur_c = 0;
-            } 
-            // 🔥 NANO & VIM FIX: Newline (\n) கர்சரை அடுத்த வரிக்கு இறக்கும்
-            else if (ch == '\n') {
-                win->cur_r++;
-                if (win->cur_r >= inner_h) {
-                    win->cur_r = inner_h - 1;
-                    // (தேவைப்பட்டால் இங்கு scroll logic இயங்கும், window_put_char பார்த்துக்கொள்ளும்)
-                    window_put_char(scr, win, '\n');
-                }
-            } 
-            else {
+            } else {
+                // 🔥 NANO & VIM FIX: எல்லா சாதாரண எழுத்துக்களும், \r, \n அனைத்தும் window_put_char-க்கே செல்ல வேண்டும்!
                 window_put_char(scr, win, ch);
             }
             break;
@@ -67,9 +54,10 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 clear_entire_window(win);
                 parser->state = STATE_NORMAL;
             }
-            // 3. Character Set Selection (\033( அல்லது \033)) - புறக்கணித்தல்:
-            else if (ch == '(' || ch == ')' || ch == '=' || ch == '>') {
-                parser->state = STATE_NORMAL;
+            // 3. 🔥 NANO FIX: Character Set Selection (\033(B அல்லது \033)0 போன்றவை)
+            // STATE_NORMAL-க்கு செல்லாமல் STATE_CHARSET-க்கு செல்ல வேண்டும்!
+            else if (ch == '(' || ch == ')' || ch == '*' || ch == '+' || ch == '=' || ch == '>') {
+                parser->state = STATE_CHARSET;
             }
             else {
                 parser->state = STATE_NORMAL;
@@ -77,6 +65,12 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                     window_put_char(scr, win, ch);
                 }
             }
+            break;
+
+        // --- 🔥 ADDED: Character Set எழுத்துக்களை ('B', '0', 'A', etc.) அச்சிடாமல் இக்னோர் செய்ய ---
+        case STATE_CHARSET:
+            // \033(B-ல் வரும் 'B' எழுத்து இங்கே விழுங்கப்பட்டுவிடும் (Zero Ghost Printing!)
+            parser->state = STATE_NORMAL;
             break;
 
         // --- Arch Linux / Starship OSC Title Sequences-ஐப் பாதுகாப்பாக இக்னோர் செய்ய ---
@@ -112,7 +106,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                     win->cur_r -= n;
                     if (win->cur_r < 0) win->cur_r = 0;
                 }
-                else if (ch == 'B') { // 🔥 Cursor Down (Nano Enter & Arrow Key Fix)
+                else if (ch == 'B') { // 🔥 Cursor Down (Nano Arrow & Enter Down Move Fix)
                     win->cur_r += n;
                     if (win->cur_r >= inner_h) win->cur_r = inner_h - 1;
                 }
