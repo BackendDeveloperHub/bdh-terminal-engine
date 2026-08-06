@@ -64,7 +64,7 @@ void tabs_draw(VirtualScreen *scr, TabBar *bar, int row) {
 void render_tab_overlay(VirtualScreen *scr, TabBar *bar) {
     if (!bar || !scr) return;
 
-    int box_top = scr->rows - 5; // திரையின் அடிபாகத்தில் பாக்ஸ் வர
+    int box_top = scr->rows - 10; // திரையின் அடிபாகத்தில் பாக்ஸ் வர
     int box_left = 1;            // Column 1-ல் இருந்து முழு அகலத்திற்கும் தொடங்கும் (0 Margin)
     int box_w = scr->cols;       // திரையின் முழு அகலம் (Full Screen Cover)
 
