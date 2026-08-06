@@ -1,4 +1,4 @@
-// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation
+// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation (scr->grid Fixed)
 #include "editor/edit.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -143,7 +143,7 @@ void editor_handle_key(EditorState *ed, const char *buf, int len) {
     }
 }
 
-// 7. 🔥 Virtual Screen-ல் எடிட்டரை வரைதல் (Zero Glitch Footer Safe Render):
+// 7. 🔥 Virtual Screen-ல் எடிட்டரை வரைதல் (scr->grid Fixed):
 void editor_draw(EditorState *ed, VirtualScreen *scr, int max_rows, int max_cols) {
     if (!ed || !scr) return;
 
@@ -152,7 +152,7 @@ void editor_draw(EditorState *ed, VirtualScreen *scr, int max_rows, int max_cols
     snprintf(header, sizeof(header), "--- [ BDH Edit : %s %s ] --- (Ctrl+S: Save | Ctrl+X: Exit)", 
              strlen(ed->filename) > 0 ? ed->filename : "Untitled", ed->is_dirty ? "[+]" : "");
     for (int c = 0; c < max_cols && c < scr->cols; c++) {
-        scr->buffer[0][c].ch = (c < (int)strlen(header)) ? header[c] : ' ';
+        scr->grid[0][c].ch = (c < (int)strlen(header)) ? header[c] : ' ';
     }
 
     // 2. Text Buffer-ஐ நடுவில் அச்சிடுதல் (கீழே 12 வரிகள் Footer-க்காக ஒதுக்கப்பட்டுள்ளது):
@@ -161,9 +161,9 @@ void editor_draw(EditorState *ed, VirtualScreen *scr, int max_rows, int max_cols
         int file_row = ed->row_offset + r - 1;
         for (int c = 0; c < max_cols && c < scr->cols; c++) {
             if (file_row < ed->num_rows && c < ed->row[file_row].size) {
-                scr->buffer[r][c].ch = ed->row[file_row].chars[c];
+                scr->grid[r][c].ch = ed->row[file_row].chars[c];
             } else {
-                scr->buffer[r][c].ch = ' ';
+                scr->grid[r][c].ch = ' ';
             }
         }
     }
