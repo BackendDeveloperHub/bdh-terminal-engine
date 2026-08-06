@@ -78,8 +78,9 @@ int main(int argc, char *argv[]) {
     }
     
     // --- FORCE 50 Rows x 220 Columns Layout ---
-    int scr_rows = 50;   
-    int scr_cols = 220;  
+     
+    int scr_rows =(ws.ws_row > 10) ? ws.ws_row : 24;
+    int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
     int pty_rows = scr_rows - 2;
     int pty_cols = scr_cols - 2;
