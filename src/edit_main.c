@@ -11,7 +11,8 @@ static struct termios orig_termios;
 
 static void disable_raw_mode(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-    write(STDOUT_FILENO, "\033[?1049l\033[?25h\033[0 q", 18); // Alternate screen-ல் இருந்து வெளியேறுதல் & இயல்பு கர்சருக்கு மாறுதல்
+    // 🔥 FIX: 19 bytes (Alternate screen-ல் இருந்து வெளியேறுதல் & இயல்பு கர்சருக்கு மாறுதல்)
+    write(STDOUT_FILENO, "\033[?1049l\033[?25h\033[0 q", 19); 
 }
 
 static void enable_raw_mode(void) {
