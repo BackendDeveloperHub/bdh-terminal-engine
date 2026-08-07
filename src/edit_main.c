@@ -1,4 +1,4 @@
-// src/editor/main.c - Standalone BDH Edit Executable (bdh-edit filename.tz)
+// src/editor/edit_main.c - Standalone BDH Edit Executable (bdh-edit filename.tz)
 #include "editor/edit.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +11,7 @@ static struct termios orig_termios;
 
 static void disable_raw_mode(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-    write(STDOUT_FILENO, "\033[?1049l\033[?25h", 13); // Alternate screen-ல் இருந்து வெளியேறுதல் & கர்சரைக் காட்டுதல்
+    write(STDOUT_FILENO, "\033[?1049l\033[?25h\033[0 q", 18); // Alternate screen-ல் இருந்து வெளியேறுதல் & இயல்பு கர்சருக்கு மாறுதல்
 }
 
 static void enable_raw_mode(void) {
@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
         // 🔥 திரையை வரைதல்:
         write(STDOUT_FILENO, "\033[?25l", 6); // வரையும்போது கர்சரை மறைத்தல்
         editor_draw(ed, NULL, rows, cols);
-        write(STDOUT_FILENO, "\033[?25h", 6); // வரைந்த பின் கர்சரைக் காட்டுதல்
+        write(STDOUT_FILENO, "\033[?25h\033[1 q", 11); // 🔥 வரைந்த பின் கர்சரைக் காட்டி Blinking Block (█) ஆக மாற்றுதல்
 
         // 🔥 கீபோர்டு உள்ளீடு (Keyboard Input):
         nread = read(STDIN_FILENO, buf, sizeof(buf) - 1);
