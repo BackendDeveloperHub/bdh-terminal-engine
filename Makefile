@@ -1,52 +1,64 @@
-# Makefile - BDH Pure Linux CLI Multiplexer Engine (Universal Edition)
-# --- FIX: Termux (clang) மற்றும் Arch Linux (gcc) இரண்டிற்கும் தானாகவே பொருந்த CC ?= gcc ---
+# Makefile - BDH Pure Linux CLI Multiplexer Engine & Standalone Editor (Universal Edition)
+# --- FIX: Termux (clang) மற்றும் Arch Linux (gcc) இரண்டிற்கும் பொருந்த CC ?= gcc ---
 CC ?= gcc
 CFLAGS = -Iinclude -Isrc -D_GNU_SOURCE -Wall -Wextra
 LDFLAGS = -lutil
 PREFIX ?= /usr/local
 
-# --- FIX: புதிய session.c மாட்யூல் இங்கு சேர்க்கப்பட்டுள்ளது ---
-SRCS = src/main.c \
-       src/engine/pty.c \
-       src/engine/screen.c \
-       src/engine/session.c \
-       src/engine/mouse.c \
-       src/ui/panes.c \
-       src/ui/wm.c \
-       src/ui/tabs.c \
-       src/ui/statusbar.c \
-       src/engine/parser.c \
-       src/engine/clipboard.c \
-       src/engine/scanner.c \
-       src/engine/cursor.c \
-       src/engine/input.c \
-       src/engine/renderer.c \
-       src/engine/terminal.c \
-       src/editor/edit.c 
+# --- 1. BDH Multiplexer Engine Sources (bdh-engine) ---
+ENGINE_SRCS = src/main.c \
+              src/engine/pty.c \
+              src/engine/screen.c \
+              src/engine/session.c \
+              src/engine/mouse.c \
+              src/ui/panes.c \
+              src/ui/wm.c \
+              src/ui/tabs.c \
+              src/ui/statusbar.c \
+              src/engine/parser.c \
+              src/engine/clipboard.c \
+              src/engine/scanner.c \
+              src/engine/cursor.c \
+              src/engine/input.c \
+              src/engine/renderer.c \
+              src/engine/terminal.c \
+              src/editor/edit.c
 
-TARGET = bdh-engine
+# --- 2. BDH Standalone Editor Sources (bdh-edit) ---
+# குறிப்பு: குழப்பம் வராமல் இருக்க src/editor/main.c-ஐ src/editor/edit_main.c எனப் பெயர் மாற்றிப் பயன்படுத்தவும்
+EDITOR_SRCS = src/editor/edit_main.c \
+              src/editor/edit.c
 
-all: $(TARGET)
+# --- Main Targets ---
+all: bdh-engine bdh-edit
 
-$(TARGET): $(SRCS)
-	$(CC) $(SRCS) $(CFLAGS) $(LDFLAGS) -o $(TARGET)
-	@echo "BDH Pure Linux CLI Multiplexer Engine built successfully! 🚀"
+# 1. Build BDH Multiplexer Engine:
+bdh-engine: $(ENGINE_SRCS)
+	$(CC) $(ENGINE_SRCS) $(CFLAGS) $(LDFLAGS) -o bdh-engine
+	@echo "BDH Multiplexer Engine (bdh-engine) built successfully! 🚀"
 
-# --- Universal System Install Target (Global CLI Command) ---
-install: $(TARGET)
-	install -Dm755 $(TARGET) $(PREFIX)/bin/$(TARGET)
+# 2. Build BDH Standalone Text Editor:
+bdh-edit: $(EDITOR_SRCS)
+	$(CC) $(EDITOR_SRCS) $(CFLAGS) -o bdh-edit
+	@echo "BDH Standalone Text Editor (bdh-edit) built successfully! 📝"
+
+# --- Universal System Install Target (Global CLI Commands) ---
+install: all
+	install -Dm755 bdh-engine $(PREFIX)/bin/bdh-engine
+	install -Dm755 bdh-edit $(PREFIX)/bin/bdh-edit
 	@echo "=================================================================="
-	@echo "🔥 BDH Engine installed globally to $(PREFIX)/bin/$(TARGET) !"
-	@echo "👉 Type 'bdh-engine' from ANY folder in your terminal to run!"
+	@echo "🔥 BDH Engine & Editor installed globally to $(PREFIX)/bin/ !"
+	@echo "👉 Type 'bdh-engine [filename]' to launch Multiplexer Engine!"
+	@echo "👉 Type 'bdh-edit [filename]' to launch Standalone Text Editor!"
 	@echo "=================================================================="
 
 # --- Universal System Uninstall Target ---
 uninstall:
-	rm -f $(PREFIX)/bin/$(TARGET)
-	@echo "BDH Engine uninstalled from system successfully!"
+	rm -f $(PREFIX)/bin/bdh-engine $(PREFIX)/bin/bdh-edit
+	@echo "BDH Engine and Editor uninstalled from system successfully!"
 
 clean:
-	rm -f $(TARGET) *.o
+	rm -f bdh-engine bdh-edit *.o
 	@echo "Cleaned old builds successfully!"
 
 .PHONY: all clean install uninstall
