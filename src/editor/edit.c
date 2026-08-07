@@ -1,4 +1,4 @@
-// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation (Blinking Block Cursor Fixed)
+// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation (Backspace & Forward Del Connected)
 #include "editor/edit.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,17 +82,44 @@ void editor_insert_char(EditorState *ed, int c) {
     ed->is_dirty = 1;
 }
 
-// 4. எழுத்துக்களை நீக்குதல் (Backspace):
+// 4a. கர்சருக்கு இடதுபுறம் உள்ள எழுத்தை நீக்குதல் (Backspace - ⌫ & Line Merge Support):
 void editor_delete_char(EditorState *ed) {
     if (ed->cy >= ed->num_rows || (ed->cx == 0 && ed->cy == 0)) return;
     EditorRow *row = &ed->row[ed->cy];
     if (ed->cx > row->size) ed->cx = row->size;
+
     if (ed->cx > 0) {
         memmove(&row->chars[ed->cx - 1], &row->chars[ed->cx], row->size - ed->cx + 1);
         row->size--;
         ed->cx--;
         ed->is_dirty = 1;
+    } else if (ed->cy > 0) {
+        // 🔥 LINE MERGE FIX: வரியின் தொடக்கத்தில் Backspace அழுத்தினால் முந்தைய வரியோடு இணைத்தல்
+        EditorRow *prev_row = &ed->row[ed->cy - 1];
+        int prev_len = prev_row->size;
+
+        prev_row->chars = (char*)realloc(prev_row->chars, prev_len + row->size + 1);
+        memcpy(&prev_row->chars[prev_len], row->chars, row->size + 1);
+        prev_row->size += row->size;
+
+        free(row->chars);
+        memmove(&ed->row[ed->cy], &ed->row[ed->cy + 1], sizeof(EditorRow) * (ed->num_rows - ed->cy - 1));
+        ed->num_rows--;
+        ed->cy--;
+        ed->cx = prev_len;
+        ed->is_dirty = 1;
     }
+}
+
+// 4b. 🔥 புதிய ஃபங்ஷன்: கர்சருக்கு வலதுபுறம் உள்ள எழுத்தை நீக்குதல் (Forward Delete - 'Del' Key / \033[3~):
+void editor_delete_char_forward(EditorState *ed) {
+    if (ed->cy >= ed->num_rows) return;
+    EditorRow *row = &ed->row[ed->cy];
+    if (ed->cx >= row->size) return; // வரியின் கடைசியில் இருந்தால் நீக்க முடியாது
+
+    memmove(&row->chars[ed->cx], &row->chars[ed->cx + 1], row->size - ed->cx);
+    row->size--;
+    ed->is_dirty = 1;
 }
 
 // 5. புதிய வரி செருகுதல் (Enter Key):
@@ -122,8 +149,9 @@ void editor_handle_key(EditorState *ed, const char *buf, int len) {
     if (len == 0) return;
     unsigned char c = buf[0];
 
-    // Arrow Keys (\033[A, \033[B, \033[C, \033[D):
+    // --- ANSI Escape Sequences (\033) ---
     if (c == '\033' && len >= 3 && buf[1] == '[') {
+        // Arrow Keys:
         if (buf[2] == 'A' && ed->cy > 0) ed->cy--; // UP
         else if (buf[2] == 'B' && ed->cy < ed->num_rows - 1) ed->cy++; // DOWN
         else if (buf[2] == 'C') { // RIGHT
@@ -131,16 +159,24 @@ void editor_handle_key(EditorState *ed, const char *buf, int len) {
         }
         else if (buf[2] == 'D' && ed->cx > 0) ed->cx--; // LEFT
         
-        // 🔥 BOUNDARY CLAMP FIX: வரி மாறும்போது cx அளவை வரியின் நீளத்திற்குள் கட்டுப்படுத்த வேண்டும்
+        // 🔥 FORWARD DELETE BUTTON CONNECT ('Del' Key -> \033[3~):
+        else if (len >= 4 && buf[2] == '3' && buf[3] == '~') {
+            editor_delete_char_forward(ed);
+            return;
+        }
+
+        // Boundary Clamp Fix:
         if (ed->cy < ed->num_rows && ed->cx > ed->row[ed->cy].size) {
             ed->cx = ed->row[ed->cy].size;
         }
         return;
     }
 
+    // --- Regular Keys ---
     if (c == '\r' || c == '\n') {
         editor_insert_newline(ed);
     } 
+    // 🔥 BACKSPACE BUTTON CONNECT (ASCII 127, 8, \b):
     else if (c == 127 || c == '\b' || c == 0x08) {
         editor_delete_char(ed);
     } 
@@ -192,7 +228,7 @@ void editor_draw(EditorState *ed, VirtualScreen *scr, int max_rows, int max_cols
 
     // 3. Bottom Help / Status Bar (Row max_rows - 1):
     len = snprintf(buf, sizeof(buf), 
-             "\033[%d;1H\033[1;33m[ BDH Edit Active ] | Arrow Keys: Move | Enter/Backspace: Edit | Ctrl+S: Save | Ctrl+X: Exit\033[0m\033[K", 
+             "\033[%d;1H\033[1;33m[ BDH Edit Active ] | Arrow Keys: Move | Enter/Backspace/Del: Edit | Ctrl+S: Save | Ctrl+X: Exit\033[0m\033[K", 
              max_rows - 1);
     write(STDOUT_FILENO, buf, len);
 
