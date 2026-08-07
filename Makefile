@@ -27,7 +27,7 @@ ENGINE_SRCS = src/main.c \
 # --- 2. BDH Standalone Editor Sources (bdh-edit) ---
 # குறிப்பு: குழப்பம் வராமல் இருக்க src/editor/main.c-ஐ src/editor/edit_main.c எனப் பெயர் மாற்றிப் பயன்படுத்தவும்
 EDITOR_SRCS = src/editor/edit_main.c \
-              src/editor/edit.c
+              src/editor/edit_main.c
 
 # --- Main Targets ---
 all: bdh-engine bdh-edit
