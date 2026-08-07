@@ -123,6 +123,9 @@ int main(int argc, char *argv[]) {
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
     if (tab_bar) render_tab_overlay(scr, tab_bar); // Permanent Footer Box
+    if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+        cursor_sync_to_window(sessions[active_idx].win);
+    }
 
     fd_set read_fds;
     char buffer[16384];
@@ -245,6 +248,9 @@ int main(int argc, char *argv[]) {
                             renderer_draw_all(scr, sessions, MAX_SESSIONS);
                             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                             if (tab_bar) render_tab_overlay(scr, tab_bar);
+                            if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                                cursor_sync_to_window(sessions[active_idx].win);
+                            }
                             write(STDOUT_FILENO, "\033[?7h", 5);
                         }
                     }
@@ -280,6 +286,9 @@ int main(int argc, char *argv[]) {
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                         if (tab_bar) render_tab_overlay(scr, tab_bar);
+                        if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                            cursor_sync_to_window(sessions[active_idx].win);
+                        }
                         write(STDOUT_FILENO, "\033[?7h", 5);
                     }
                     continue; 
@@ -388,6 +397,13 @@ render_check:
                 renderer_draw_all(scr, sessions, MAX_SESSIONS);
                 if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                 if (tab_bar) render_tab_overlay(scr, tab_bar); // Permanent Footer Box
+                
+                // 🔥 THE CRITICAL CURSOR SYNC FIX:
+                // Footer வரையப்பட்ட பிறகு கர்சரை கீழே விடாமல், Active PTY Window-வின்
+                // சரியான இடத்திற்கு கொண்டு வந்து நிறுத்தி மிளிரச் செய்கிறோம்!
+                if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                    cursor_sync_to_window(sessions[active_idx].win);
+                }
             }
 
             write(STDOUT_FILENO, "\033[?7h", 5); 
