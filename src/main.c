@@ -56,9 +56,6 @@ static void setup_signal_handlers() {
 }
 
 int main(int argc, char *argv[]) {
-    (void)argc;
-    (void)argv;
-
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
@@ -165,7 +162,8 @@ int main(int argc, char *argv[]) {
                 // --- 🔥 SHORTCUT: Ctrl + E (Built-in Editor Mode ஆன்/ஆஃப் செய்தல்) ---
                 if (buffer[0] == 5 && nread == 1) { // Ctrl + E = 0x05
                     if (bdh_editor && !bdh_editor->is_active) {
-                        editor_open(bdh_editor, "bdh_note.txt");
+                        // 🔥 மாஸ் அப்டேட்: கட்டளை வரியில் கொடுத்த ஃபைல் பெயர் (argv[1]) திறக்கப்படும்!
+                        editor_open(bdh_editor, (argc > 1) ? argv[1] : "bdh_note.txt");
                         bdh_editor->is_active = 1;
                         write(STDOUT_FILENO, "\033[2J\033[H", 7); // 🔥 முழு திரையையும் துடைத்து எடிட்டரைக் காட்டுதல்
                         if (status_bar) statusbar_set_mode(status_bar, "EDITOR");
