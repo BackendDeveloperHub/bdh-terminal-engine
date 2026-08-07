@@ -162,14 +162,16 @@ int main(int argc, char *argv[]) {
             if (nread > 0) {
                 buffer[nread] = '\0'; // கட்டாயம் Null-Terminate செய்ய வேண்டும்!
 
-                // --- SHORTCUT: Ctrl + E (Built-in Editor Mode ஆன்/ஆஃப் செய்தல்) ---
+                // --- 🔥 SHORTCUT: Ctrl + E (Built-in Editor Mode ஆன்/ஆஃப் செய்தல்) ---
                 if (buffer[0] == 5 && nread == 1) { // Ctrl + E = 0x05
                     if (bdh_editor && !bdh_editor->is_active) {
                         editor_open(bdh_editor, "bdh_note.txt");
                         bdh_editor->is_active = 1;
+                        write(STDOUT_FILENO, "\033[2J\033[H", 7); // 🔥 முழு திரையையும் துடைத்து எடிட்டரைக் காட்டுதல்
                         if (status_bar) statusbar_set_mode(status_bar, "EDITOR");
                     } else if (bdh_editor) {
                         bdh_editor->is_active = 0;
+                        write(STDOUT_FILENO, "\033[2J\033[H", 7); // 🔥 எடிட்டரை மூடிவிட்டு ஷெல்லுக்குத் திரும்புதல்
                         if (status_bar) statusbar_set_mode(status_bar, "NORMAL");
                     }
                     needs_render = 1;
@@ -187,6 +189,7 @@ int main(int argc, char *argv[]) {
                     }
                     if (buffer[0] == 24 && nread == 1) { // Ctrl + X = Close Editor & Return to Shell
                         bdh_editor->is_active = 0;
+                        write(STDOUT_FILENO, "\033[2J\033[H", 7); // 🔥 திரையைத் துடைத்து ஷெல்லுக்குத் திரும்புதல்
                         if (status_bar) statusbar_set_mode(status_bar, "NORMAL");
                         needs_render = 1;
                         goto render_check;
@@ -374,20 +377,21 @@ int main(int argc, char *argv[]) {
         }
 
 render_check:
-        // --- 🔥 RENDER LOOP WITH PERMANENT FOOTER & BDH EDIT SUPPORT ---
+        // --- 🔥 RENDER LOOP WITH 100% CLEAN EDITOR & SHELL SEPARATION ---
         if (needs_render) {
             write(STDOUT_FILENO, "\033[?7l", 5); 
             
             if (bdh_editor && bdh_editor->is_active) {
-                // 🔥 Editor Mode ஆன்-ல் இருந்தால் BDH Edit திரையில் வரையப்படும்:
+                // 🔥 100% DEDICATED EDITOR RENDER BLOCK
+                // எந்த PTY அல்லது Footer ஓவர்லேப்பும் எடிட்டரின் கர்சரை கெடுக்காதபடி தனி பிளாக்:
                 editor_draw(bdh_editor, scr, scr_rows, scr_cols);
             } else {
-                // Shell Mode-ல் இருந்தால் வழக்கமான டெர்மினல் வரையப்படும்:
+                // SHELL MODE (PTY + Active Sessions Manager Footer)
                 renderer_draw_all(scr, sessions, MAX_SESSIONS);
+                if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+                if (tab_bar) render_tab_overlay(scr, tab_bar); // Permanent Footer Box
             }
 
-            if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
-            if (tab_bar) render_tab_overlay(scr, tab_bar); // Footer எப்பொழுதும் பாதுகாப்பாக இருக்கும்!
             write(STDOUT_FILENO, "\033[?7h", 5); 
         }
     }
