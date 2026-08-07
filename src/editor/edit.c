@@ -1,4 +1,4 @@
-// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation (100% Bulletproof Fixed)
+// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation (Blinking Block Cursor Fixed)
 #include "editor/edit.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -196,10 +196,10 @@ void editor_draw(EditorState *ed, VirtualScreen *scr, int max_rows, int max_cols
              max_rows - 1);
     write(STDOUT_FILENO, buf, len);
 
-    // 4. கர்சரை நாம் டைப் செய்யும் சரியான இடத்தில் (cx, cy) உட்கார வைப்பது:
+    // 4. 🔥 BLINKING BLOCK CURSOR FIX: கர்சரை சரியான இடத்தில் (cx, cy) உட்கார வைத்து Blinking Block (█) ஆக மிளிர வைப்பது!
     int screen_cursor_r = (ed->cy - ed->row_offset) + 2;
     int screen_cursor_c = ed->cx + 1;
-    len = snprintf(buf, sizeof(buf), "\033[%d;%dH", screen_cursor_r, screen_cursor_c);
+    len = snprintf(buf, sizeof(buf), "\033[%d;%dH\033[?25h\033[1 q", screen_cursor_r, screen_cursor_c);
     write(STDOUT_FILENO, buf, len);
 }
 
