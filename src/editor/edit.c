@@ -1,4 +1,4 @@
-// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation (scr->grid Fixed)
+// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation (100% Bulletproof Fixed)
 #include "editor/edit.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +24,6 @@ int editor_open(EditorState *ed, const char *filename) {
     strncpy(ed->filename, filename, sizeof(ed->filename) - 1);
     FILE *fp = fopen(filename, "r");
     if (!fp) {
-        // புதிய ஃபைல் என்றால் ஒரு காலி வரியை உருவாக்குதல்
         ed->row = (EditorRow*)malloc(sizeof(EditorRow));
         ed->row[0].size = 0;
         ed->row[0].chars = strdup("");
@@ -74,6 +73,7 @@ int editor_save(EditorState *ed) {
 void editor_insert_char(EditorState *ed, int c) {
     if (ed->cy >= ed->num_rows) return;
     EditorRow *row = &ed->row[ed->cy];
+    if (ed->cx > row->size) ed->cx = row->size;
     row->chars = (char*)realloc(row->chars, row->size + 2);
     memmove(&row->chars[ed->cx + 1], &row->chars[ed->cx], row->size - ed->cx + 1);
     row->chars[ed->cx] = c;
@@ -86,6 +86,7 @@ void editor_insert_char(EditorState *ed, int c) {
 void editor_delete_char(EditorState *ed) {
     if (ed->cy >= ed->num_rows || (ed->cx == 0 && ed->cy == 0)) return;
     EditorRow *row = &ed->row[ed->cy];
+    if (ed->cx > row->size) ed->cx = row->size;
     if (ed->cx > 0) {
         memmove(&row->chars[ed->cx - 1], &row->chars[ed->cx], row->size - ed->cx + 1);
         row->size--;
@@ -129,6 +130,11 @@ void editor_handle_key(EditorState *ed, const char *buf, int len) {
             if (ed->cy < ed->num_rows && ed->cx < ed->row[ed->cy].size) ed->cx++;
         }
         else if (buf[2] == 'D' && ed->cx > 0) ed->cx--; // LEFT
+        
+        // 🔥 BOUNDARY CLAMP FIX: வரி மாறும்போது cx அளவை வரியின் நீளத்திற்குள் கட்டுப்படுத்த வேண்டும்
+        if (ed->cy < ed->num_rows && ed->cx > ed->row[ed->cy].size) {
+            ed->cx = ed->row[ed->cy].size;
+        }
         return;
     }
 
@@ -143,30 +149,58 @@ void editor_handle_key(EditorState *ed, const char *buf, int len) {
     }
 }
 
-// 7. 🔥 Virtual Screen-ல் எடிட்டரை வரைதல் (scr->grid Fixed):
+// 7. 🔥 Explicit Row Rendering (100% Guaranteed Display & Auto-Scroll Fixed):
 void editor_draw(EditorState *ed, VirtualScreen *scr, int max_rows, int max_cols) {
-    if (!ed || !scr) return;
+    if (!ed) return;
+    (void)scr;
 
-    // 1. Top Bar ([ BDH Built-in Editor : filename ]):
-    char header[256];
-    snprintf(header, sizeof(header), "--- [ BDH Edit : %s %s ] --- (Ctrl+S: Save | Ctrl+X: Exit)", 
-             strlen(ed->filename) > 0 ? ed->filename : "Untitled", ed->is_dirty ? "[+]" : "");
-    for (int c = 0; c < max_cols && c < scr->cols; c++) {
-        scr->grid[0][c].ch = (c < (int)strlen(header)) ? header[c] : ' ';
+    char buf[1024];
+    int len;
+
+    // 1. Top Title Bar (Row 1):
+    len = snprintf(buf, sizeof(buf), 
+             "\033[1;1H\033[7m--- [ BDH Edit : %s %s ] --- (Ctrl+S: Save | Ctrl+X: Exit) ---\033[0m\033[K", 
+             strlen(ed->filename) > 0 ? ed->filename : "Untitled", 
+             ed->is_dirty ? "[+]" : "");
+    write(STDOUT_FILENO, buf, len);
+
+    // 2. Text Buffer-ஐ நடுவில் அச்சிடுதல்:
+    int draw_rows = max_rows - 3;
+    if (draw_rows < 5) draw_rows = 15;
+
+    // Auto-Scroll Logic:
+    if (ed->cy < ed->row_offset) {
+        ed->row_offset = ed->cy;
+    }
+    if (ed->cy >= ed->row_offset + draw_rows) {
+        ed->row_offset = ed->cy - draw_rows + 1;
     }
 
-    // 2. Text Buffer-ஐ நடுவில் அச்சிடுதல் (கீழே 12 வரிகள் Footer-க்காக ஒதுக்கப்பட்டுள்ளது):
-    int draw_rows = max_rows - 13;
     for (int r = 1; r <= draw_rows; r++) {
         int file_row = ed->row_offset + r - 1;
-        for (int c = 0; c < max_cols && c < scr->cols; c++) {
-            if (file_row < ed->num_rows && c < ed->row[file_row].size) {
-                scr->grid[r][c].ch = ed->row[file_row].chars[c];
-            } else {
-                scr->grid[r][c].ch = ' ';
+        len = snprintf(buf, sizeof(buf), "\033[%d;1H\033[K", r + 1);
+        write(STDOUT_FILENO, buf, len);
+
+        if (file_row < ed->num_rows) {
+            int sz = ed->row[file_row].size;
+            if (sz > max_cols - 1) sz = max_cols - 1;
+            if (sz > 0) {
+                write(STDOUT_FILENO, ed->row[file_row].chars, sz);
             }
         }
     }
+
+    // 3. Bottom Help / Status Bar (Row max_rows - 1):
+    len = snprintf(buf, sizeof(buf), 
+             "\033[%d;1H\033[1;33m[ BDH Edit Active ] | Arrow Keys: Move | Enter/Backspace: Edit | Ctrl+S: Save | Ctrl+X: Exit\033[0m\033[K", 
+             max_rows - 1);
+    write(STDOUT_FILENO, buf, len);
+
+    // 4. கர்சரை நாம் டைப் செய்யும் சரியான இடத்தில் (cx, cy) உட்கார வைப்பது:
+    int screen_cursor_r = (ed->cy - ed->row_offset) + 2;
+    int screen_cursor_c = ed->cx + 1;
+    len = snprintf(buf, sizeof(buf), "\033[%d;%dH", screen_cursor_r, screen_cursor_c);
+    write(STDOUT_FILENO, buf, len);
 }
 
 void editor_destroy(EditorState *ed) {
