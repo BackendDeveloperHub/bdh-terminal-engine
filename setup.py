@@ -6,7 +6,7 @@ import tarfile
 import os
 
 # GitHub Release URL 
-GITHUB_REPO_URL = "https://github.com/BackendDeveloperHub/bdh-terminal-engine/archive/refs/tags/0.0.3.tar.gz"
+GITHUB_REPO_URL = "https://github.com/BackendDeveloperHub/bdh-terminal-engine/archive/refs/tags/0.0.4.tar.gz"
 
 class PostInstallCommand(install):
     """Post-installation for installation mode."""
@@ -42,7 +42,7 @@ class PostInstallCommand(install):
 
 setup(
     name="bdh-terminal-engine",
-    version="0.0.3",
+    version="0.0.4",
     description="A 100% Pure Linux CLI Terminal Multiplexer written in C.",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
