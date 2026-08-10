@@ -56,7 +56,7 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: POSIX :: Linux",
-        "Topic :: Terminals :: Terminal Emulators/X-Terminals",
+        "Topic :: Terminals :: Terminal Emulators/X Terminals",
     ],
     python_requires='>=3.6',
 )
