@@ -6,7 +6,7 @@ import tarfile
 import os
 
 # GitHub Release URL 
-GITHUB_REPO_URL = "https://github.com/BackendDeveloperHub/bdh-terminal-engine/archive/refs/tags/0.0.1.tar.gz"
+GITHUB_REPO_URL = "https://github.com/BackendDeveloperHub/bdh-terminal-engine/archive/refs/tags/0.0.2.tar.gz"
 
 class PostInstallCommand(install):
     """Post-installation for installation mode."""
