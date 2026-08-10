@@ -6,7 +6,7 @@ import tarfile
 import os
 
 # GitHub Release URL (உங்களது லேட்டஸ்ட் வெர்ஷன்டட் டார் கோப்பு அல்லது ரிலீஸ்)
-GITHUB_REPO_URL = "https://github.com/BackendDeveloperHub/bdh-terminal-engine/archive/refs/tags/v1.0.0.tar.gz"
+GITHUB_REPO_URL = "https://github.com/BackendDeveloperHub/bdh-terminal-engine/archive/refs/tags/0.0.1.tar.gz"
 
 class PostInstallCommand(install):
     """Post-installation for installation mode. (PyPI-ல் இன்ஸ்டால் ஆனதும் C இன்ஜினை பில்ட் செய்யும்)"""
