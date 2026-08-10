@@ -5,11 +5,11 @@ import urllib.request
 import tarfile
 import os
 
-# GitHub Release URL (உங்களது லேட்டஸ்ட் வெர்ஷன்டட் டார் கோப்பு அல்லது ரிலீஸ்)
+# GitHub Release URL 
 GITHUB_REPO_URL = "https://github.com/BackendDeveloperHub/bdh-terminal-engine/archive/refs/tags/0.0.1.tar.gz"
 
 class PostInstallCommand(install):
-    """Post-installation for installation mode. (PyPI-ல் இன்ஸ்டால் ஆனதும் C இன்ஜினை பில்ட் செய்யும்)"""
+    """Post-installation for installation mode."""
     def run(self):
         install.run(self)
         print("\n[BDH Engine] Downloading & Compiling bdh-terminal-engine from GitHub Release...")
@@ -25,13 +25,12 @@ class PostInstallCommand(install):
             tar.extractall(path=extract_dir)
             
         # 3. Make & Install செய்தல்
-        # (கவனிக்க: சோர்ஸ் உள்ள ஃபுல்டருக்குச் சென்று make & make install இயக்குவது)
         extracted_folder = [os.path.join(extract_dir, d) for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))][0]
         
         subprocess.run(["make", "clean"], cwd=extracted_folder, check=True)
         subprocess.run(["make"], cwd=extracted_folder, check=True)
         
-        # சிஸ்டம் பார்த்-க்கு காப்பி செய்தல் (Global Command)
+        # சிஸ்டம் பார்த்-க்கு காப்பி செய்தல் 
         binary_path = os.path.join(extracted_folder, "bdh-engine")
         dest_path = "/usr/local/bin/bdh-terminal-engine"
         
@@ -43,12 +42,12 @@ class PostInstallCommand(install):
 
 setup(
     name="bdh-terminal-engine",
-    version="1.0.0",
+    version="0.0.1",
     description="A 100% Pure Linux CLI Terminal Multiplexer written in C.",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
-    author="Prabakaran",
-    author_email="your-email@example.com",
+    author="Prabakaran P",
+    author_email="Prabakaran20020430@gmail.com",
     url="https://github.com/BackendDeveloperHub/bdh-terminal-engine",
     packages=find_packages(),
     cmdclass={
