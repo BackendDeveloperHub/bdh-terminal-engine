@@ -58,6 +58,9 @@ int main(int argc, char *argv[]) {
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
+    // 🔥 FIX: Nested TUI ப்ரோக்ராம்களுக்கு 256 Color சப்போர்ட் வழங்குவதற்கான அடையாளம்!
+    setenv("TERM", "xterm-256color", 1);
+
     printf("\r\n[BDH Engine] Starting Responsive Custom Mode (Bash Edition - 12 Default / 18 Max Sessions)...\r\n");
 
     char *user_shell = getenv("SHELL");
