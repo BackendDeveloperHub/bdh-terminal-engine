@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Zsh & Built-in Editor Edition - 12 Default / 18 Max Cap)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Bash & Built-in Editor Edition - 12 Default / 18 Max Cap)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -58,11 +58,11 @@ int main(int argc, char *argv[]) {
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
-    printf("\r\n[BDH Engine] Starting Responsive Custom Mode (Zsh Edition - 12 Default / 18 Max Sessions)...\r\n");
+    printf("\r\n[BDH Engine] Starting Responsive Custom Mode (Bash Edition - 12 Default / 18 Max Sessions)...\r\n");
 
     char *user_shell = getenv("SHELL");
     if (!user_shell || strlen(user_shell) == 0) {
-        user_shell = "/bin/zsh"; 
+        user_shell = "/bin/bash"; // 🔥 Zsh-க்கு பதிலாக Bash-ஆக மாற்றப்பட்டுள்ளது
     }
     char *shell_argv[] = {user_shell, NULL};
 
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     int active_idx = 0;
 
     Clipboard *engine_cb = clipboard_create();
-    const char *default_cmd = "echo BDH Zsh Multiplexer Active!\n";
+    const char *default_cmd = "echo BDH Bash Multiplexer Active!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
     TokenScanner *token_scanner = scanner_create();
@@ -108,7 +108,8 @@ int main(int argc, char *argv[]) {
     char tab_name_buffers[MAX_SESSIONS][32];
 
     for (int i = 0; i < MAX_SESSIONS; i++) {
-        snprintf(tab_name_buffers[i], sizeof(tab_name_buffers[i]), "ZSH-%d", i + 1);
+        // 🔥 ZSH-ஐ BASH என மாற்றியுள்ளோம்
+        snprintf(tab_name_buffers[i], sizeof(tab_name_buffers[i]), "BASH-%d", i + 1);
         tab_names[i] = tab_name_buffers[i];
     }
 
@@ -124,7 +125,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < MAX_SESSIONS; i++) {
         if (sessions[i].is_alive && sessions[i].master_fd >= 0) {
             ioctl(sessions[i].master_fd, TIOCSWINSZ, &ws_pty);
-            if (sessions[i].win) sessions[i].win->h = pty_rows;
+            // win->h என்ற எரர் தரும் வரியை நீக்கிவிட்டோம்!
         }
     }
 
@@ -243,7 +244,6 @@ int main(int argc, char *argv[]) {
 
                             if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
-                            // 🔥 UI Updates before Terminal Write
                             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                             if (tab_bar) render_tab_overlay(scr, tab_bar);
                             renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -276,7 +276,6 @@ int main(int argc, char *argv[]) {
 
                         if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
-                        // 🔥 UI Updates before Terminal Write
                         if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                         if (tab_bar) render_tab_overlay(scr, tab_bar);
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -374,11 +373,8 @@ render_check:
             if (bdh_editor && bdh_editor->is_active) {
                 editor_draw(bdh_editor, scr, scr_rows, scr_cols);
             } else {
-                // முதலில் மெமரியில் UI-ஐ வரைந்துவிட்டு...
                 if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                 if (tab_bar) render_tab_overlay(scr, tab_bar); 
-                
-                // மொத்தத்தையும் ஒரே அடியில் ஸ்கிரீனில் கொட்டுகிறோம்!
                 renderer_draw_all(scr, sessions, MAX_SESSIONS);
             }
         }
