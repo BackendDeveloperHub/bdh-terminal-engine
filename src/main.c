@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Bash & Built-in Editor Edition - 12 Default / 18 Max Cap)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (12 Default / 18 Max Cap)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -24,7 +24,7 @@
 #include "engine/renderer.h"
 #include "engine/terminal.h"
 #include "engine/session.h"
-#include "editor/edit.h" 
+// 🔥 FIX: editor/edit.h நீக்கப்பட்டுவிட்டது!
 
 #ifndef MAX_SESSIONS
 #define MAX_SESSIONS 18
@@ -55,10 +55,12 @@ static void setup_signal_handlers() {
 }
 
 int main(int argc, char *argv[]) {
+    (void)argc;
+    (void)argv;
+    
     atexit(terminal_disable_raw_mode);
     setup_signal_handlers();
 
-    // 🔥 FIX: Nested TUI ப்ரோக்ராம்களுக்கு 256 Color சப்போர்ட் வழங்குவதற்கான அடையாளம்!
     setenv("TERM", "xterm-256color", 1);
 
     printf("\r\n[BDH Engine] Starting Responsive Custom Mode (Bash Edition - 12 Default / 18 Max Sessions)...\r\n");
@@ -101,10 +103,11 @@ int main(int argc, char *argv[]) {
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
     
-    EditorState *bdh_editor = editor_create();
+    // 🔥 FIX: EditorState நீக்கப்பட்டுவிட்டது!
     
     statusbar_set_mode(status_bar, "NORMAL");
-    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+E: Edit | Ctrl+K: Scan");
+    // 🔥 FIX: Ctrl+E (Edit) ஷார்ட்கட் நீக்கப்பட்டுவிட்டது!
+    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
 
     char *tab_names[MAX_SESSIONS];
     char tab_name_buffers[MAX_SESSIONS][32];
@@ -128,7 +131,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // 🔥 FIX: Initial Pipeline Order
     screen_clear(scr);
     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
         window_draw(scr, sessions[active_idx].win);
@@ -171,41 +173,7 @@ int main(int argc, char *argv[]) {
             if (nread > 0) {
                 buffer[nread] = '\0'; 
 
-                if (buffer[0] == 5 && nread == 1) { 
-                    if (bdh_editor && !bdh_editor->is_active) {
-                        editor_open(bdh_editor, (argc > 1) ? argv[1] : "bdh_note.txt");
-                        bdh_editor->is_active = 1;
-                        write(STDOUT_FILENO, "\033[2J\033[H", 7); 
-                        if (status_bar) statusbar_set_mode(status_bar, "EDITOR");
-                    } else if (bdh_editor) {
-                        bdh_editor->is_active = 0;
-                        write(STDOUT_FILENO, "\033[2J\033[H", 7); 
-                        if (status_bar) statusbar_set_mode(status_bar, "NORMAL");
-                    }
-                    needs_render = 1;
-                    goto render_check;
-                }
-
-                if (bdh_editor && bdh_editor->is_active) {
-                    if (buffer[0] == 19 && nread == 1) { 
-                        if (editor_save(bdh_editor)) {
-                            if (status_bar) statusbar_set_text(status_bar, "[ Saved Successfully! ]", "BDH Edit");
-                        }
-                        needs_render = 1;
-                        goto render_check;
-                    }
-                    if (buffer[0] == 24 && nread == 1) { 
-                        bdh_editor->is_active = 0;
-                        write(STDOUT_FILENO, "\033[2J\033[H", 7); 
-                        if (status_bar) statusbar_set_mode(status_bar, "NORMAL");
-                        needs_render = 1;
-                        goto render_check;
-                    }
-
-                    editor_handle_key(bdh_editor, buffer, nread);
-                    needs_render = 1;
-                    goto render_check; 
-                }
+                // 🔥 FIX: Ctrl+E லாஜிக் மற்றும் Editor Key handler முழுமையாக நீக்கப்பட்டுவிட்டது!
 
                 if (token_scanner && token_scanner->is_scanning_mode) {
                     if (buffer[0] >= '1' && buffer[0] <= '9') {
@@ -247,7 +215,6 @@ int main(int argc, char *argv[]) {
 
                             if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
-                            // 🔥 FIX: Mouse click Pipeline Order
                             screen_clear(scr);
                             if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
                                 window_draw(scr, sessions[active_idx].win);
@@ -284,7 +251,6 @@ int main(int argc, char *argv[]) {
 
                         if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
-                        // 🔥 FIX: Shortcut Pipeline Order
                         screen_clear(scr);
                         if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
                             window_draw(scr, sessions[active_idx].win);
@@ -381,32 +347,22 @@ int main(int argc, char *argv[]) {
         }
 
 render_check:
-        // --- 🔥 FIXED RENDER LOOP (Proper RAM Orchestration) ---
         if (needs_render) {
-            if (bdh_editor && bdh_editor->is_active) {
-                editor_draw(bdh_editor, scr, scr_rows, scr_cols);
-            } else {
-                // 1. மெமரியை சுத்தமாக்குகிறோம்
-                screen_clear(scr);
-                
-                // 2. Active PTY-ஐ மெமரியில் வரைகிறோம்
-                if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
-                    window_draw(scr, sessions[active_idx].win);
-                }
-
-                // 3. UI-ஐ மெமரியில் வரைகிறோம் (Overlaps PTY cleanly)
-                if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
-                if (tab_bar) render_tab_overlay(scr, tab_bar); 
-                
-                // 4. Delta Update மூலம் டெர்மினலில் கொட்டுகிறோம்
-                renderer_draw_all(scr, sessions, MAX_SESSIONS);
+            // 🔥 FIX: Editor render லாஜிக் நீக்கப்பட்டு Pure RAM Orchestration மட்டும் உள்ளது
+            screen_clear(scr);
+            
+            if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                window_draw(scr, sessions[active_idx].win);
             }
+
+            if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+            if (tab_bar) render_tab_overlay(scr, tab_bar); 
+            
+            renderer_draw_all(scr, sessions, MAX_SESSIONS);
         }
     }
 
-    if (bdh_editor) {
-        editor_destroy(bdh_editor);
-    }
+    // 🔥 FIX: editor_destroy நீக்கப்பட்டுவிட்டது!
     sessions_cleanup_all(sessions, tab_bar, status_bar, token_scanner, engine_cb, scr);
 
     write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13);
