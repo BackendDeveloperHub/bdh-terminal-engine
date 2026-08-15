@@ -27,7 +27,7 @@ static void abFree(struct abuf *ab) {
 // -----------------------------------------------------------------
 
 void renderer_draw_all(VirtualScreen *scr, void *sessions_ptr, int count) {
-    if (!scr || !scr->grid || !scr->old_grid || !sessions_ptr) {
+    if (!scr || !scr->grid || !scr->old_grid || !sessions_ptr || count <= 0) {
         return;
     }
 
@@ -78,7 +78,7 @@ void renderer_draw_all(VirtualScreen *scr, void *sessions_ptr, int count) {
                     current_color = new_cell.fg_color;
                 }
 
-                // 3. 🔥 எழுத்தை பிரிண்ட் செய்கிறோம் (Empty character-ஐ ஸ்பேஸாக மாற்றுகிறோம்)
+                // 3. எழுத்தை பிரிண்ட் செய்கிறோம் (Empty character-ஐ ஸ்பேஸாக மாற்றுகிறோம்)
                 char out_ch = (new_cell.ch == '\0' || new_cell.ch == 0) ? ' ' : new_cell.ch;
                 abAppend(&ab, &out_ch, 1);
 
