@@ -1,0 +1,3 @@
+[submodule "src/bdh-ide"]
+	path = src/bdh-ide
+	url = https://github.com/BackendDeveloperHub/bdh-linux-ide.git
