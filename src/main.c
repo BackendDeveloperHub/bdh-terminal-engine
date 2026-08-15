@@ -33,7 +33,6 @@
 #define DEFAULT_SESSIONS 12
 
 static void fatal_signal_handler(int signo) {
-    // 🔥 FIX: Restore Auto-Wrap on Fatal Exit
     write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13);
     terminal_disable_raw_mode();
     
@@ -68,8 +67,6 @@ int main(int argc, char *argv[]) {
     char *shell_argv[] = {user_shell, NULL};
 
     terminal_enable_raw_mode();
-    
-    // 🔥 FIX: Startup-லேயே ஒருமுறை மட்டும் Auto-Wrap-ஐ Disable (\033[?7l) செய்கிறோம்! 
     write(STDOUT_FILENO, "\033[?1049h\033[H\033[?7l", 16);
 
     struct winsize ws = {0};
@@ -80,7 +77,8 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
     int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
-    int pty_rows = scr_rows - 13;
+    // 🔥 FIX 1: PTY Height-ஐ 15 வரிகள் சுருக்கி Footer-க்கு இடம் விடுகிறோம்
+    int pty_rows = scr_rows - 15;
     int pty_cols = scr_cols - 2;
 
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
@@ -116,12 +114,24 @@ int main(int argc, char *argv[]) {
 
     sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
-    renderer_draw_all(scr, sessions, MAX_SESSIONS);
+    // 🔥 FIX 2: PTY-ஐ பலவந்தமாக Footer-க்கு மேலே சுருக்கும் கர்னல் கமாண்ட்
+    struct winsize ws_pty;
+    ws_pty.ws_row = pty_rows;
+    ws_pty.ws_col = pty_cols;
+    ws_pty.ws_xpixel = 0;
+    ws_pty.ws_ypixel = 0;
+
+    for (int i = 0; i < MAX_SESSIONS; i++) {
+        if (sessions[i].is_alive && sessions[i].master_fd >= 0) {
+            ioctl(sessions[i].master_fd, TIOCSWINSZ, &ws_pty);
+            if (sessions[i].win) sessions[i].win->h = pty_rows;
+        }
+    }
+
+    // 🔥 FIX 3: RAM Rendering Order (UI முதலில் -> Terminal Print கடைசியாக)
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
     if (tab_bar) render_tab_overlay(scr, tab_bar); 
-    if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
-        cursor_sync_to_window(sessions[active_idx].win);
-    }
+    renderer_draw_all(scr, sessions, MAX_SESSIONS);
 
     fd_set read_fds;
     char buffer[16384];
@@ -233,13 +243,10 @@ int main(int argc, char *argv[]) {
 
                             if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
-                            // 🔥 FIX: அகற்றப்பட்ட \033[?7l & \033[?7h
-                            renderer_draw_all(scr, sessions, MAX_SESSIONS);
+                            // 🔥 UI Updates before Terminal Write
                             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                             if (tab_bar) render_tab_overlay(scr, tab_bar);
-                            if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
-                                cursor_sync_to_window(sessions[active_idx].win);
-                            }
+                            renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         }
                     }
                     continue; 
@@ -269,13 +276,10 @@ int main(int argc, char *argv[]) {
 
                         if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
-                        // 🔥 FIX: அகற்றப்பட்ட \033[?7l & \033[?7h
-                        renderer_draw_all(scr, sessions, MAX_SESSIONS);
+                        // 🔥 UI Updates before Terminal Write
                         if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                         if (tab_bar) render_tab_overlay(scr, tab_bar);
-                        if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
-                            cursor_sync_to_window(sessions[active_idx].win);
-                        }
+                        renderer_draw_all(scr, sessions, MAX_SESSIONS);
                     }
                     continue; 
                 }
@@ -365,18 +369,17 @@ int main(int argc, char *argv[]) {
         }
 
 render_check:
-        // --- 🔥 RENDER LOOP (100% GLITCH FREE - WRAP TOGGLES REMOVED) ---
+        // --- 🔥 RENDER LOOP (100% RAM Buffered Architecture) ---
         if (needs_render) {
             if (bdh_editor && bdh_editor->is_active) {
                 editor_draw(bdh_editor, scr, scr_rows, scr_cols);
             } else {
-                renderer_draw_all(scr, sessions, MAX_SESSIONS);
+                // முதலில் மெமரியில் UI-ஐ வரைந்துவிட்டு...
                 if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                 if (tab_bar) render_tab_overlay(scr, tab_bar); 
                 
-                if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
-                    cursor_sync_to_window(sessions[active_idx].win);
-                }
+                // மொத்தத்தையும் ஒரே அடியில் ஸ்கிரீனில் கொட்டுகிறோம்!
+                renderer_draw_all(scr, sessions, MAX_SESSIONS);
             }
         }
     }
@@ -386,7 +389,6 @@ render_check:
     }
     sessions_cleanup_all(sessions, tab_bar, status_bar, token_scanner, engine_cb, scr);
 
-    // 🔥 FIX: Clean Exit - Restore Auto-Wrap (\033[?7h)
     write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13);
     printf("\r\nBDH Pure Linux CLI Multiplexer Exited Cleanly.\r\n");
     return EXIT_SUCCESS;
