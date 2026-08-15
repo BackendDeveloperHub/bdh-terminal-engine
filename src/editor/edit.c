@@ -1,9 +1,29 @@
-// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation (Backspace & Forward Del Connected)
+// src/editor/edit.c - BDH Built-in Lightweight CLI Text Editor Implementation (Anti-Glitch Double Buffering)
 #include "editor/edit.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+// --- ADDED: Double Buffering-க்கான Append Buffer ஸ்ட்ரக்சர் ---
+struct abuf {
+    char *b;
+    int len;
+};
+#define ABUF_INIT {NULL, 0}
+
+void abAppend(struct abuf *ab, const char *s, int len) {
+    char *new = realloc(ab->b, ab->len + len);
+    if (new == NULL) return;
+    memcpy(&new[ab->len], s, len);
+    ab->b = new;
+    ab->len += len;
+}
+
+void abFree(struct abuf *ab) {
+    free(ab->b);
+}
+// -----------------------------------------------------------------
 
 EditorState* editor_create(void) {
     EditorState *ed = (EditorState*)malloc(sizeof(EditorState));
@@ -94,7 +114,7 @@ void editor_delete_char(EditorState *ed) {
         ed->cx--;
         ed->is_dirty = 1;
     } else if (ed->cy > 0) {
-        // 🔥 LINE MERGE FIX: வரியின் தொடக்கத்தில் Backspace அழுத்தினால் முந்தைய வரியோடு இணைத்தல்
+        // 🔥 LINE MERGE FIX
         EditorRow *prev_row = &ed->row[ed->cy - 1];
         int prev_len = prev_row->size;
 
@@ -111,11 +131,11 @@ void editor_delete_char(EditorState *ed) {
     }
 }
 
-// 4b. 🔥 புதிய ஃபங்ஷன்: கர்சருக்கு வலதுபுறம் உள்ள எழுத்தை நீக்குதல் (Forward Delete - 'Del' Key / \033[3~):
+// 4b. 🔥 கர்சருக்கு வலதுபுறம் உள்ள எழுத்தை நீக்குதல் (Forward Delete - 'Del' Key / \033[3~):
 void editor_delete_char_forward(EditorState *ed) {
     if (ed->cy >= ed->num_rows) return;
     EditorRow *row = &ed->row[ed->cy];
-    if (ed->cx >= row->size) return; // வரியின் கடைசியில் இருந்தால் நீக்க முடியாது
+    if (ed->cx >= row->size) return; 
 
     memmove(&row->chars[ed->cx], &row->chars[ed->cx + 1], row->size - ed->cx);
     row->size--;
@@ -149,34 +169,27 @@ void editor_handle_key(EditorState *ed, const char *buf, int len) {
     if (len == 0) return;
     unsigned char c = buf[0];
 
-    // --- ANSI Escape Sequences (\033) ---
     if (c == '\033' && len >= 3 && buf[1] == '[') {
-        // Arrow Keys:
         if (buf[2] == 'A' && ed->cy > 0) ed->cy--; // UP
         else if (buf[2] == 'B' && ed->cy < ed->num_rows - 1) ed->cy++; // DOWN
         else if (buf[2] == 'C') { // RIGHT
             if (ed->cy < ed->num_rows && ed->cx < ed->row[ed->cy].size) ed->cx++;
         }
         else if (buf[2] == 'D' && ed->cx > 0) ed->cx--; // LEFT
-        
-        // 🔥 FORWARD DELETE BUTTON CONNECT ('Del' Key -> \033[3~):
         else if (len >= 4 && buf[2] == '3' && buf[3] == '~') {
             editor_delete_char_forward(ed);
             return;
         }
 
-        // Boundary Clamp Fix:
         if (ed->cy < ed->num_rows && ed->cx > ed->row[ed->cy].size) {
             ed->cx = ed->row[ed->cy].size;
         }
         return;
     }
 
-    // --- Regular Keys ---
     if (c == '\r' || c == '\n') {
         editor_insert_newline(ed);
     } 
-    // 🔥 BACKSPACE BUTTON CONNECT (ASCII 127, 8, \b):
     else if (c == 127 || c == '\b' || c == 0x08) {
         editor_delete_char(ed);
     } 
@@ -185,20 +198,24 @@ void editor_handle_key(EditorState *ed, const char *buf, int len) {
     }
 }
 
-// 7. 🔥 Explicit Row Rendering (100% Guaranteed Display & Auto-Scroll Fixed):
+// 7. 🔥 Explicit Row Rendering (Anti-Glitch Double Buffering Version):
 void editor_draw(EditorState *ed, VirtualScreen *scr, int max_rows, int max_cols) {
     if (!ed) return;
     (void)scr;
 
+    struct abuf ab = ABUF_INIT;
     char buf[1024];
     int len;
+
+    // கர்சரை முதலில் மறைக்கிறோம்
+    abAppend(&ab, "\033[?25l", 6);
 
     // 1. Top Title Bar (Row 1):
     len = snprintf(buf, sizeof(buf), 
              "\033[1;1H\033[7m--- [ BDH Edit : %s %s ] --- (Ctrl+S: Save | Ctrl+X: Exit) ---\033[0m\033[K", 
              strlen(ed->filename) > 0 ? ed->filename : "Untitled", 
              ed->is_dirty ? "[+]" : "");
-    write(STDOUT_FILENO, buf, len);
+    abAppend(&ab, buf, len);
 
     // 2. Text Buffer-ஐ நடுவில் அச்சிடுதல்:
     int draw_rows = max_rows - 3;
@@ -214,14 +231,16 @@ void editor_draw(EditorState *ed, VirtualScreen *scr, int max_rows, int max_cols
 
     for (int r = 1; r <= draw_rows; r++) {
         int file_row = ed->row_offset + r - 1;
+        
+        // பழைய எழுத்துக்களை க்ளியர் செய்தல் (\033[K)
         len = snprintf(buf, sizeof(buf), "\033[%d;1H\033[K", r + 1);
-        write(STDOUT_FILENO, buf, len);
+        abAppend(&ab, buf, len);
 
         if (file_row < ed->num_rows) {
             int sz = ed->row[file_row].size;
             if (sz > max_cols - 1) sz = max_cols - 1;
             if (sz > 0) {
-                write(STDOUT_FILENO, ed->row[file_row].chars, sz);
+                abAppend(&ab, ed->row[file_row].chars, sz);
             }
         }
     }
@@ -230,13 +249,17 @@ void editor_draw(EditorState *ed, VirtualScreen *scr, int max_rows, int max_cols
     len = snprintf(buf, sizeof(buf), 
              "\033[%d;1H\033[1;33m[ BDH Edit Active ] | Arrow Keys: Move | Enter/Backspace/Del: Edit | Ctrl+S: Save | Ctrl+X: Exit\033[0m\033[K", 
              max_rows - 1);
-    write(STDOUT_FILENO, buf, len);
+    abAppend(&ab, buf, len);
 
-    // 4. 🔥 BLINKING BLOCK CURSOR FIX: கர்சரை சரியான இடத்தில் (cx, cy) உட்கார வைத்து Blinking Block (█) ஆக மிளிர வைப்பது!
+    // 4. 🔥 BLINKING BLOCK CURSOR FIX: கர்சரை சரியான இடத்தில் உட்கார வைத்து மிளிர வைப்பது!
     int screen_cursor_r = (ed->cy - ed->row_offset) + 2;
     int screen_cursor_c = ed->cx + 1;
     len = snprintf(buf, sizeof(buf), "\033[%d;%dH\033[?25h\033[1 q", screen_cursor_r, screen_cursor_c);
-    write(STDOUT_FILENO, buf, len);
+    abAppend(&ab, buf, len);
+
+    // ஒட்டுமொத்த எடிட்டரையும் ஒரே அடியில் திரையில் கொட்டுகிறோம்!
+    write(STDOUT_FILENO, ab.b, ab.len);
+    abFree(&ab);
 }
 
 void editor_destroy(EditorState *ed) {
