@@ -126,9 +126,8 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 if (win->cur_c >= inner_w) win->cur_c = inner_w - 1;
             }
             else if ((unsigned char)ch >= 32 && ch != 127) {
-                // 🔥 நிறங்களை Window-க்கு அனுப்புவதற்கான லாஜிக்
-                // (இப்போதைக்கு எழுத்து மட்டும் போகும், ui/panes-ஐ அப்டேட் செய்தபின் கலரும் சேரும்)
-                window_put_char(scr, win, ch); 
+                // 🔥 FIXED: இப்போது 5 ஆர்கியுமெண்ட்கள் சரியாக அனுப்பப்படும்!
+                window_put_char(scr, win, ch, parser->current_fg, parser->current_bg); 
             }
             break;
 
