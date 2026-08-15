@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
 
     char *user_shell = getenv("SHELL");
     if (!user_shell || strlen(user_shell) == 0) {
-        user_shell = "/bin/bash"; // 🔥 Zsh-க்கு பதிலாக Bash-ஆக மாற்றப்பட்டுள்ளது
+        user_shell = "/bin/bash"; 
     }
     char *shell_argv[] = {user_shell, NULL};
 
@@ -77,7 +77,6 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
     int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
-    // 🔥 FIX 1: PTY Height-ஐ 15 வரிகள் சுருக்கி Footer-க்கு இடம் விடுகிறோம்
     int pty_rows = scr_rows - 15;
     int pty_cols = scr_cols - 2;
 
@@ -108,14 +107,12 @@ int main(int argc, char *argv[]) {
     char tab_name_buffers[MAX_SESSIONS][32];
 
     for (int i = 0; i < MAX_SESSIONS; i++) {
-        // 🔥 ZSH-ஐ BASH என மாற்றியுள்ளோம்
         snprintf(tab_name_buffers[i], sizeof(tab_name_buffers[i]), "BASH-%d", i + 1);
         tab_names[i] = tab_name_buffers[i];
     }
 
     sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
-    // 🔥 FIX 2: PTY-ஐ பலவந்தமாக Footer-க்கு மேலே சுருக்கும் கர்னல் கமாண்ட்
     struct winsize ws_pty;
     ws_pty.ws_row = pty_rows;
     ws_pty.ws_col = pty_cols;
@@ -125,11 +122,14 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < MAX_SESSIONS; i++) {
         if (sessions[i].is_alive && sessions[i].master_fd >= 0) {
             ioctl(sessions[i].master_fd, TIOCSWINSZ, &ws_pty);
-            // win->h என்ற எரர் தரும் வரியை நீக்கிவிட்டோம்!
         }
     }
 
-    // 🔥 FIX 3: RAM Rendering Order (UI முதலில் -> Terminal Print கடைசியாக)
+    // 🔥 FIX: Initial Pipeline Order
+    screen_clear(scr);
+    if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+        window_draw(scr, sessions[active_idx].win);
+    }
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
     if (tab_bar) render_tab_overlay(scr, tab_bar); 
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -244,6 +244,11 @@ int main(int argc, char *argv[]) {
 
                             if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
+                            // 🔥 FIX: Mouse click Pipeline Order
+                            screen_clear(scr);
+                            if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                                window_draw(scr, sessions[active_idx].win);
+                            }
                             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                             if (tab_bar) render_tab_overlay(scr, tab_bar);
                             renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -276,6 +281,11 @@ int main(int argc, char *argv[]) {
 
                         if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
+                        // 🔥 FIX: Shortcut Pipeline Order
+                        screen_clear(scr);
+                        if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                            window_draw(scr, sessions[active_idx].win);
+                        }
                         if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                         if (tab_bar) render_tab_overlay(scr, tab_bar);
                         renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -368,13 +378,24 @@ int main(int argc, char *argv[]) {
         }
 
 render_check:
-        // --- 🔥 RENDER LOOP (100% RAM Buffered Architecture) ---
+        // --- 🔥 FIXED RENDER LOOP (Proper RAM Orchestration) ---
         if (needs_render) {
             if (bdh_editor && bdh_editor->is_active) {
                 editor_draw(bdh_editor, scr, scr_rows, scr_cols);
             } else {
+                // 1. மெமரியை சுத்தமாக்குகிறோம்
+                screen_clear(scr);
+                
+                // 2. Active PTY-ஐ மெமரியில் வரைகிறோம்
+                if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                    window_draw(scr, sessions[active_idx].win);
+                }
+
+                // 3. UI-ஐ மெமரியில் வரைகிறோம் (Overlaps PTY cleanly)
                 if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
                 if (tab_bar) render_tab_overlay(scr, tab_bar); 
+                
+                // 4. Delta Update மூலம் டெர்மினலில் கொட்டுகிறோம்
                 renderer_draw_all(scr, sessions, MAX_SESSIONS);
             }
         }
