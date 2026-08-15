@@ -1,4 +1,4 @@
-// src/engine/parser.h - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser Header
+// src/engine/parser.h - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser Header (256-Color Ready)
 #ifndef BDH_PARSER_H
 #define BDH_PARSER_H
 
@@ -9,15 +9,17 @@ typedef enum {
     STATE_NORMAL,
     STATE_ESC,
     STATE_CSI,
-    STATE_OSC,  // <-- ADDED: Arch Linux / Starship OSC Title Sequences-ஐ கையாள
+    STATE_OSC,  // Arch Linux / Starship OSC Title Sequences-ஐ கையாள
     STATE_CHARSET
 } ParserState;
 
 typedef struct {
     ParserState state;
-    int args[4];
+    int args[16];    // 🔥 4-ல் இருந்து 16 ஆக மாற்றப்பட்டுள்ளது (256-Colors-க்காக)
     int arg_count;
     int cur_val;
+    int current_fg;  // 🔥 தற்போதைய எழுத்தின் நிறம் (Foreground)
+    int current_bg;  // 🔥 தற்போதைய பின்னணி நிறம் (Background)
 } AnsiParser;
 
 AnsiParser* parser_create(void);
