@@ -1,4 +1,4 @@
-// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (Zero-Glitch Typing Fixed)
+// src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (256-Color Supported)
 #include "parser.h"
 #include <stdlib.h>
 
@@ -7,11 +7,12 @@ AnsiParser* parser_create(void) {
     parser->state = STATE_NORMAL;
     parser->arg_count = 0;
     parser->cur_val = 0;
-    for (int i = 0; i < 4; i++) parser->args[i] = 0;
+    parser->current_fg = 7; // Default White
+    parser->current_bg = 0; // Default Black
+    for (int i = 0; i < 16; i++) parser->args[i] = 0; // 🔥 16 Args Support
     return parser;
 }
 
-// முழு விண்டோவையும் சுத்தமாகத் துடைத்து கர்சரை (0,0) மூலையில் நிறுத்தும் பங்க்ஷன்:
 static void clear_entire_window(FloatingWindow *win) {
     int inner_w = win->width - 2;
     int inner_h = win->height - 2;
@@ -104,7 +105,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
 
     switch (parser->state) {
         case STATE_NORMAL:
-            if (ch == '\033') { // Escape Byte (0x1B)
+            if (ch == '\033') { 
                 parser->state = STATE_ESC;
             } 
             else if (ch == '\r') {
@@ -117,20 +118,17 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                     win->cur_r = inner_h - 1;
                 }
             } 
-            // 🔥 1. BACKSPACE FIX (\b அல்லது 0x08): கர்சரை ஒரு இடம் இடதுபுறம் நகர்த்த வேண்டும் (Glitch வராது!)
             else if (ch == '\b' || ch == 0x08) {
-                if (win->cur_c > 0) {
-                    win->cur_c--;
-                }
+                if (win->cur_c > 0) win->cur_c--;
             }
-            // 🔥 2. TAB FIX (\t அல்லது 0x09): 8 ஸ்பேஸ் தள்ளி Tab Stop-ல் அமர்த்த வேண்டும்
             else if (ch == '\t') {
                 win->cur_c = (win->cur_c + 8) & ~7;
                 if (win->cur_c >= inner_w) win->cur_c = inner_w - 1;
             }
-            // 🔥 3. ZERO-GLITCH GOLDEN RULE: அச்சிடக்கூடிய எழுத்துக்கள் (>= 32 மற்றும் != 127 DEL) மட்டுமே திரைக்குச் செல்லும்!
             else if ((unsigned char)ch >= 32 && ch != 127) {
-                window_put_char(scr, win, ch);
+                // 🔥 நிறங்களை Window-க்கு அனுப்புவதற்கான லாஜிக்
+                // (இப்போதைக்கு எழுத்து மட்டும் போகும், ui/panes-ஐ அப்டேட் செய்தபின் கலரும் சேரும்)
+                window_put_char(scr, win, ch); 
             }
             break;
 
@@ -139,40 +137,22 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 parser->state = STATE_CSI;
                 parser->arg_count = 0;
                 parser->cur_val = 0;
-                for (int i = 0; i < 4; i++) parser->args[i] = 0;
+                for (int i = 0; i < 16; i++) parser->args[i] = 0;
             }
-            else if (ch == ']') {
-                parser->state = STATE_OSC;
-            }
-            else if (ch == 'c') {
-                clear_entire_window(win);
-                parser->state = STATE_NORMAL;
-            }
-            else if (ch == '(' || ch == ')' || ch == '*' || ch == '+' || ch == '=' || ch == '>') {
-                parser->state = STATE_CHARSET;
-            }
+            else if (ch == ']') parser->state = STATE_OSC;
+            else if (ch == 'c') { clear_entire_window(win); parser->state = STATE_NORMAL; }
+            else if (ch == '(' || ch == ')' || ch == '*' || ch == '+' || ch == '=' || ch == '>') parser->state = STATE_CHARSET;
             else if (ch == 'D') {
                 win->cur_r++;
-                if (win->cur_r >= inner_h) {
-                    parser_scroll_up(win, 1);
-                    win->cur_r = inner_h - 1;
-                }
+                if (win->cur_r >= inner_h) { parser_scroll_up(win, 1); win->cur_r = inner_h - 1; }
                 parser->state = STATE_NORMAL;
             }
             else if (ch == 'M') {
                 win->cur_r--;
-                if (win->cur_r < 0) {
-                    parser_scroll_down(win, 1);
-                    win->cur_r = 0;
-                }
+                if (win->cur_r < 0) { parser_scroll_down(win, 1); win->cur_r = 0; }
                 parser->state = STATE_NORMAL;
             }
-            else if (ch == '7' || ch == '8' || ch == 'E' || ch == 'H') {
-                parser->state = STATE_NORMAL;
-            }
-            else {
-                parser->state = STATE_NORMAL;
-            }
+            else parser->state = STATE_NORMAL;
             break;
 
         case STATE_CHARSET:
@@ -180,9 +160,7 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
             break;
 
         case STATE_OSC:
-            if (ch == '\007' || ch == '\\') {
-                parser->state = STATE_NORMAL;
-            }
+            if (ch == '\007' || ch == '\\') parser->state = STATE_NORMAL;
             break;
 
         case STATE_CSI:
@@ -193,108 +171,86 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 parser->cur_val = (parser->cur_val * 10) + (ch - '0');
             }
             else if (ch == ';') {
-                if (parser->arg_count < 4) {
-                    parser->args[parser->arg_count++] = parser->cur_val;
-                }
+                if (parser->arg_count < 16) parser->args[parser->arg_count++] = parser->cur_val;
                 parser->cur_val = 0;
             }
             else if (ch >= 0x40 && ch <= 0x7E) {
-                if (parser->arg_count < 4) {
-                    parser->args[parser->arg_count++] = parser->cur_val;
-                }
-
+                if (parser->arg_count < 16) parser->args[parser->arg_count++] = parser->cur_val;
                 int n = (parser->args[0] > 0) ? parser->args[0] : 1;
 
-                if (ch == 'A') {
-                    win->cur_r -= n;
-                    if (win->cur_r < 0) win->cur_r = 0;
-                }
-                else if (ch == 'B') {
-                    win->cur_r += n;
-                    if (win->cur_r >= inner_h) win->cur_r = inner_h - 1;
-                }
-                else if (ch == 'C') {
-                    win->cur_c += n;
-                    if (win->cur_c >= inner_w) win->cur_c = inner_w - 1;
-                }
-                else if (ch == 'D') {
-                    win->cur_c -= n;
-                    if (win->cur_c < 0) win->cur_c = 0;
-                }
+                if (ch == 'A') { win->cur_r -= n; if (win->cur_r < 0) win->cur_r = 0; }
+                else if (ch == 'B') { win->cur_r += n; if (win->cur_r >= inner_h) win->cur_r = inner_h - 1; }
+                else if (ch == 'C') { win->cur_c += n; if (win->cur_c >= inner_w) win->cur_c = inner_w - 1; }
+                else if (ch == 'D') { win->cur_c -= n; if (win->cur_c < 0) win->cur_c = 0; }
                 else if (ch == 'G') {
                     int col = (parser->args[0] > 0) ? parser->args[0] - 1 : 0;
-                    if (col < 0) col = 0;
                     if (col >= inner_w) col = inner_w - 1;
                     win->cur_c = col;
                 }
                 else if (ch == 'd') {
                     int row = (parser->args[0] > 0) ? parser->args[0] - 1 : 0;
-                    if (row < 0) row = 0;
                     if (row >= inner_h) row = inner_h - 1;
                     win->cur_r = row;
                 }
                 else if (ch == 'H' || ch == 'f') {
                     int row = (parser->args[0] > 0) ? parser->args[0] - 1 : 0;
                     int col = (parser->arg_count > 1 && parser->args[1] > 0) ? parser->args[1] - 1 : 0;
-                    if (row < 0) row = 0;
                     if (row >= inner_h) row = inner_h - 1;
-                    if (col < 0) col = 0;
                     if (col >= inner_w) col = inner_w - 1;
-                    win->cur_r = row;
-                    win->cur_c = col;
+                    win->cur_r = row; win->cur_c = col;
                 }
-                else if (ch == 'L') {
-                    insert_lines(win, n);
-                }
-                else if (ch == 'M') {
-                    delete_lines(win, n);
-                }
-                else if (ch == 'S') {
-                    parser_scroll_up(win, n);
-                }
-                else if (ch == 'T') {
-                    parser_scroll_down(win, n);
-                }
-                else if (ch == 'K') {
-                    int mode = parser->args[0];
-                    if (mode == 0) {
-                        for (int c = win->cur_c; c < inner_w && c < WIN_MAX_COLS; c++) {
-                            win->text[win->cur_r][c] = ' ';
-                        }
-                    } else if (mode == 1) {
-                        for (int c = 0; c <= win->cur_c && c < inner_w && c < WIN_MAX_COLS; c++) {
-                            win->text[win->cur_r][c] = ' ';
-                        }
-                    } else if (mode == 2) {
-                        for (int c = 0; c < inner_w && c < WIN_MAX_COLS; c++) {
-                            win->text[win->cur_r][c] = ' ';
+                else if (ch == 'L') insert_lines(win, n);
+                else if (ch == 'M') delete_lines(win, n);
+                else if (ch == 'S') parser_scroll_up(win, n);
+                else if (ch == 'T') parser_scroll_down(win, n);
+                
+                // 🔥 NEW: ANSI Color Parsing Magic ('m' Command)
+                else if (ch == 'm') {
+                    if (parser->arg_count == 0) {
+                        parser->current_fg = 7; // Reset to White
+                        parser->current_bg = 0; // Reset to Black
+                    } else {
+                        for (int i = 0; i < parser->arg_count; i++) {
+                            int code = parser->args[i];
+                            if (code == 0) {
+                                parser->current_fg = 7;
+                                parser->current_bg = 0;
+                            } else if (code >= 30 && code <= 37) {
+                                parser->current_fg = code - 30;
+                            } else if (code >= 40 && code <= 47) {
+                                parser->current_bg = code - 40;
+                            } else if (code == 38) {
+                                // 256 Color Foreground: 38;5;X
+                                if (i + 2 < parser->arg_count && parser->args[i+1] == 5) {
+                                    parser->current_fg = parser->args[i+2];
+                                    i += 2;
+                                }
+                            } else if (code == 48) {
+                                // 256 Color Background: 48;5;X
+                                if (i + 2 < parser->arg_count && parser->args[i+1] == 5) {
+                                    parser->current_bg = parser->args[i+2];
+                                    i += 2;
+                                }
+                            } else if (code >= 90 && code <= 97) {
+                                parser->current_fg = (code - 90) + 8; // Bright fg
+                            }
                         }
                     }
+                }
+                
+                else if (ch == 'K') {
+                    int mode = parser->args[0];
+                    if (mode == 0) for (int c = win->cur_c; c < inner_w; c++) win->text[win->cur_r][c] = ' ';
+                    else if (mode == 1) for (int c = 0; c <= win->cur_c; c++) win->text[win->cur_r][c] = ' ';
+                    else if (mode == 2) for (int c = 0; c < inner_w; c++) win->text[win->cur_r][c] = ' ';
                 }
                 else if (ch == 'J') {
                     int mode = parser->args[0];
-                    if (mode == 2 || mode == 3) {
-                        clear_entire_window(win);
-                    } 
+                    if (mode == 2 || mode == 3) clear_entire_window(win);
                     else if (mode == 0) {
-                        for (int c = win->cur_c; c < inner_w && c < WIN_MAX_COLS; c++) {
-                            win->text[win->cur_r][c] = ' ';
-                        }
-                        for (int r = win->cur_r + 1; r < inner_h && r < WIN_MAX_ROWS; r++) {
-                            for (int c = 0; c < inner_w && c < WIN_MAX_COLS; c++) {
-                                win->text[r][c] = ' ';
-                            }
-                        }
-                    }
-                    else if (mode == 1) {
-                        for (int r = 0; r < win->cur_r && r < WIN_MAX_ROWS; r++) {
-                            for (int c = 0; c < inner_w && c < WIN_MAX_COLS; c++) {
-                                win->text[r][c] = ' ';
-                            }
-                        }
-                        for (int c = 0; c <= win->cur_c && c < inner_w && c < WIN_MAX_COLS; c++) {
-                            win->text[win->cur_r][c] = ' ';
-                        }
+                        for (int c = win->cur_c; c < inner_w; c++) win->text[win->cur_r][c] = ' ';
+                        for (int r = win->cur_r + 1; r < inner_h; r++)
+                            for (int c = 0; c < inner_w; c++) win->text[r][c] = ' ';
                     }
                 }
 
