@@ -23,7 +23,6 @@
 #include "engine/renderer.h"
 #include "engine/terminal.h"
 #include "engine/session.h"
-// 🔥 FIX: scanner.h மற்றும் editor/edit.h நீக்கப்பட்டுவிட்டது!
 
 #ifndef MAX_SESSIONS
 #define MAX_SESSIONS 18
@@ -53,7 +52,7 @@ static void setup_signal_handlers() {
     sigaction(SIGABRT, &sa, NULL);
 }
 
-// 🔥 THE ARCHITECT FIX: Direct Native Overlay Rendering (Bypasses Window Manager Bugs!)
+// 🔥 Direct Native Overlay Rendering
 static void draw_session_manager_direct(TerminalSession sessions[], char *tab_names[], int active_idx, int scr_cols, int scr_rows) {
     int start_row = scr_rows - 11; // Status bar is at scr_rows - 1, Manager takes 11 rows
     if (start_row < 2) return; 
@@ -148,7 +147,6 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
     int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
-    // 🔥 FIX: Terminal Multiplexer-ன் உயரத்தை -13 ஆக குறைத்துள்ளோம் (Manager Box-க்காக)
     int pty_rows = scr_rows - 13; 
     int pty_cols = scr_cols - 2;
 
@@ -201,7 +199,6 @@ int main(int argc, char *argv[]) {
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
     if (tab_bar) render_tab_overlay(scr, tab_bar); 
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
-    // Initial Render
     draw_session_manager_direct(sessions, tab_names, active_idx, scr_cols, scr_rows);
 
     fd_set read_fds;
@@ -379,8 +376,19 @@ render_check:
             
             renderer_draw_all(scr, sessions, MAX_SESSIONS);
 
-            // 🔥 NEW: Draw Manager UI Directly!
+            // Draw Manager UI Directly!
             draw_session_manager_direct(sessions, tab_names, active_idx, scr_cols, scr_rows);
+
+            // 🔥 THE ARCHITECT FIX: RESTORE CURSOR POSITION!
+            // கர்சரை மீண்டும் கமாண்ட் பிராம்ப்ட்-ல் (Active Terminal) வைக்கிறோம்.
+            if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                int cursor_r = sessions[active_idx].win->y + 2 + sessions[active_idx].win->cur_r;
+                int cursor_c = sessions[active_idx].win->x + 2 + sessions[active_idx].win->cur_c;
+                char cursor_restore[32];
+                // \033[%d;%dH -> கர்சரை குறிப்பிட்ட இடத்திற்கு நகர்த்தும் ANSI கோட்
+                int cr_len = snprintf(cursor_restore, sizeof(cursor_restore), "\033[%d;%dH", cursor_r, cursor_c);
+                write(STDOUT_FILENO, cursor_restore, cr_len);
+            }
         }
     }
 
