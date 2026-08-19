@@ -1,4 +1,4 @@
-// src/engine/renderer.c - BDH Pure Linux CLI Multiplexer Renderer (True Delta Flush & 256-Color Optimized)
+// src/engine/renderer.c - BDH Pure Linux CLI Multiplexer Renderer (True Delta Flush & Cursor Fixed)
 #include "engine/renderer.h"
 #include "engine/session.h"
 #include "engine/cursor.h"
@@ -116,18 +116,35 @@ void renderer_draw_all(VirtualScreen *scr, void *sessions_ptr, int count) {
         abAppend(&ab, "\033[0m", 4);
     }
 
-    // கர்சரை மீண்டும் திரையில் தெரியும்படி ஆன் செய்தல்
-    abAppend(&ab, "\033[?25h", 6);
-
     // மொத்த டெல்டா பஃபரையும் ஒரே ஃப்ளஷ்ஷில் டெர்மினலுக்கு அனுப்புதல்
     if (ab.len > 0) {
         write(STDOUT_FILENO, ab.b, ab.len);
     }
     abFree(&ab);
 
-    // கர்சரை விண்டோவின் சரியான பொசிஷனுக்கு ஒத்திசைத்தல்
+    // =========================================================================
+    // 🔥 THE ARCHITECT FIX: கர்சரை விண்டோவின் சரியான உள் பொசிஷனுக்கு ஒத்திசைத்தல்
+    // =========================================================================
     if (active_win != NULL) {
-        cursor_sync_to_window(active_win);
+        if (active_win->scroll_offset > 0) {
+            // ஸ்க்ரோல் மோடில் இருக்கும்போது கர்சரை மறைத்துவிட வேண்டும் (Clean UX)
+            write(STDOUT_FILENO, "\033[?25l", 6); 
+        } else {
+            // panes.c-ல் நாம் பயன்படுத்திய அதே விண்டோ பார்டர் அளவுகள்
+            int start_r = 1;  
+            int start_c = 0;  
+
+            // +1 for inner window offset (border-ஐத் தாண்ட), +1 for 1-based ANSI terminal index
+            int ansi_row = start_r + 1 + active_win->cur_r + 1;
+            int ansi_col = start_c + 1 + active_win->cur_c + 1;
+
+            char move_buf[32];
+            int len = snprintf(move_buf, sizeof(move_buf), "\033[%d;%dH", ansi_row, ansi_col);
+            write(STDOUT_FILENO, move_buf, len);
+            
+            // கர்சரை மீண்டும் ஒளிரச் செய்தல் (Block Cursor Style: \033[2 q)
+            write(STDOUT_FILENO, "\033[?25h\033[2 q", 11); 
+        }
     } else {
         char move_buf[32];
         int len = snprintf(move_buf, sizeof(move_buf), "\033[%d;%dH", scr->rows, 1);
