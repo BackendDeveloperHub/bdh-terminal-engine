@@ -1,14 +1,43 @@
-# Makefile - BDH Pure Linux CLI Multiplexer Engine (Universal Edition)
-# --- FIX: Termux (clang) மற்றும் Arch Linux (gcc) இரண்டிற்கும் பொருந்த CC ?= gcc ---
-CC ?= gcc
+# Makefile - BDH Pure Linux CLI Multiplexer Engine (Dynamic OS Auto-Detect Edition)
+
+# ==============================================================================
+# 🔥 OS DETECTION ENGINE (The Architect Update)
+# ==============================================================================
+UNAME_S := $(shell uname -s)
+UNAME_O := $(shell uname -o 2>/dev/null || echo "Other")
+
+# டீஃபால்ட் செட்டிங்ஸ்
 CFLAGS = -Iinclude -Isrc -D_GNU_SOURCE -Wall -Wextra
 LDFLAGS = -lutil
 PREFIX ?= /usr/local
 
+# 1. Termux (Android) Environment
+ifeq ($(UNAME_O), Android)
+    CC = clang
+    PREFIX = /data/data/com.termux/files/usr
+    OS_NAME = Termux (Android)
+
+# 2. Standard Linux Environment (Rocky, Arch, Ubuntu, Proot)
+else ifeq ($(UNAME_S), Linux)
+    CC = gcc
+    OS_NAME = Standard Linux
+
+# 3. macOS (Apple) Environment
+else ifeq ($(UNAME_S), Darwin)
+    CC = clang
+    OS_NAME = macOS (Darwin)
+
+# மற்ற OS-களுக்கு
+else
+    CC = gcc
+    OS_NAME = Unknown OS
+endif
+# ==============================================================================
+
 # --- BDH Linux IDE Submodule Directory ---
 IDE_DIR = src/bdh-ide
 
-# --- 1. BDH Multiplexer Engine Sources (bdh-engine) ---
+# --- BDH Multiplexer Engine Sources ---
 ENGINE_SRCS = src/main.c \
               src/engine/pty.c \
               src/engine/screen.c \
@@ -27,7 +56,15 @@ ENGINE_SRCS = src/main.c \
               src/engine/terminal.c
 
 # --- Main Targets ---
-all: bdh-engine build-ide
+all: check-os bdh-engine build-ide
+
+# 🔥 பில்ட் ஆகும்முன் எந்த OS என்று ஸ்க்ரீனில் கெத்தாகக் காட்டும் லாஜிக்
+check-os:
+	@echo "================================================="
+	@echo "🔍 Auto-Detected OS : $(OS_NAME)"
+	@echo "⚙️  Selected Compiler: $(CC)"
+	@echo "📁 Install Path     : $(PREFIX)"
+	@echo "================================================="
 
 # 1. Build BDH Multiplexer Engine:
 bdh-engine: $(ENGINE_SRCS)
@@ -43,7 +80,7 @@ build-ide:
 		echo "⚠️ BDH Linux IDE folder not found or empty! Did you run 'git submodule add'?"; \
 	fi
 
-# --- Universal System Install Target (Global CLI Commands) ---
+# --- Universal System Install Target ---
 install: all
 	install -Dm755 bdh-engine $(PREFIX)/bin/bdh-engine
 	@if [ -d "$(IDE_DIR)" ] && [ -f "$(IDE_DIR)/Makefile" ]; then \
@@ -72,4 +109,4 @@ clean:
 	fi
 	@echo "Cleaned old builds successfully!"
 
-.PHONY: all build-ide clean install uninstall
+.PHONY: all check-os build-ide clean install uninstall
