@@ -340,7 +340,7 @@ int main(int argc, char *argv[]) {
                             if (sessions[free_idx].pid > 0) {
                                 sessions[free_idx].is_alive = 1;
                                 if (sessions[free_idx].win) {
-                                    window_clear(sessions[free_idx].win);
+                                    window_create(sessions[free_idx].win);
                                     sessions[free_idx].win->cur_r = 0;
                                     sessions[free_idx].win->cur_c = 0;
                                 }
