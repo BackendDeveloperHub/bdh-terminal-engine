@@ -37,7 +37,8 @@ void sessions_init_all(TerminalSession sessions[MAX_SESSIONS], char *shell_argv[
         snprintf(win_title, sizeof(win_title), "[ TAB %d/%d : %s %s ]", 
                  i + 1, MAX_SESSIONS, tab_names[i], (i == 0) ? "(ACTIVE) *" : "");
                  
-        sessions[i].win = window_create(i, 0, 1, scr_cols, scr_rows - 2, win_title, (i == 0) ? 1 : 0);
+        // 🔥 THE ARCHITECT FIX: விண்டோ உயரத்தை (scr_rows - 12) ஆகக் குறைத்துள்ளோம்!
+        sessions[i].win = window_create(i, 0, 1, scr_cols, scr_rows - 12, win_title, (i == 0) ? 1 : 0);
         sessions[i].parser = parser_create();
         
         if (sessions[i].win != NULL && sessions[i].parser != NULL) {
