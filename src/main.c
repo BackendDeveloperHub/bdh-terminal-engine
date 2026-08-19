@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (100% Stable UI Architecture)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (100% Stable UI Architecture & Responsive)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -28,6 +28,13 @@
 #define MAX_SESSIONS 18
 #endif
 
+// 🔥 THE ARCHITECT FIX: Termux Zoom / Resize Signal Flag
+volatile sig_atomic_t window_resized = 0;
+
+static void handle_sigwinch(int signo) {
+    window_resized = 1; // Window Size மாறினால் இந்த கொடி (flag) பறக்கும்!
+}
+
 static void fatal_signal_handler(int signo) {
     write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13);
     terminal_disable_raw_mode();
@@ -46,9 +53,18 @@ static void setup_signal_handlers() {
     sigaction(SIGTERM, &sa, NULL);
     sigaction(SIGINT,  &sa, NULL);
     sigaction(SIGABRT, &sa, NULL);
+
+    // 🔥 Window Resize Signal (Zoom in Termux) Handler
+    struct sigaction sa_winch;
+    sa_winch.sa_handler = handle_sigwinch;
+    sigemptyset(&sa_winch.sa_mask);
+    sa_winch.sa_flags = 0;
+    sigaction(SIGWINCH, &sa_winch, NULL);
 }
 
 static void draw_session_manager_to_screen(VirtualScreen *scr, TerminalSession sessions[], char *tab_names[], int active_idx) {
+    if (scr->rows < 16) return; // Safety check
+
     int start_row = scr->rows - 12; 
     if (start_row < 2) return; 
 
@@ -172,6 +188,43 @@ int main(int argc, char *argv[]) {
     int needs_render = 1; 
 
     while (engine_running) {
+        
+        // 🔥 THE ARCHITECT FIX: Handle Termux Zoom (Resize) on-the-fly!
+        if (window_resized) {
+            window_resized = 0;
+            
+            if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1) {
+                scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
+                scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
+                
+                pty_rows = scr_rows - 14; 
+                pty_cols = scr_cols - 2;
+                
+                ws_pty.ws_row = pty_rows;
+                ws_pty.ws_col = pty_cols;
+                
+                for (int i = 0; i < MAX_SESSIONS; i++) {
+                    // 1. PTY-களின் அளவை அப்டேட் செய்கிறோம்
+                    if (sessions[i].is_alive && sessions[i].master_fd >= 0) {
+                        ioctl(sessions[i].master_fd, TIOCSWINSZ, &ws_pty);
+                    }
+                    // 2. விண்டோ அளவுகளை அப்டேட் செய்கிறோம்
+                    if (sessions[i].win != NULL) {
+                        sessions[i].win->width = scr_cols;
+                        sessions[i].win->height = scr_rows - 12; 
+                    }
+                }
+                
+                // 3. பழைய VirtualScreen-ஐ அழித்துவிட்டு புதிய அளவுடன் உருவாக்குகிறோம்
+                if (scr) screen_destroy(scr);
+                scr = screen_create(scr_rows, scr_cols);
+                
+                // 4. ஸ்க்ரீனில் உள்ள குப்பைகளை (Artifacts) க்ளீன் செய்ய Hard Reset செய்கிறோம்
+                write(STDOUT_FILENO, "\033[2J\033[H", 7);
+                needs_render = 1;
+            }
+        }
+
         FD_ZERO(&read_fds);
         FD_SET(STDIN_FILENO, &read_fds);
         max_fd = STDIN_FILENO;
@@ -185,7 +238,7 @@ int main(int argc, char *argv[]) {
 
         struct timeval tv = {0, 10000};
         if (select(max_fd + 1, &read_fds, NULL, NULL, &tv) == -1) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR) continue; // Resize Signal வரும்போது Select Interrupted ஆகும், அதைத் தாண்டி தொடரச் சொல்கிறோம்!
             break;
         }
 
@@ -210,7 +263,6 @@ int main(int argc, char *argv[]) {
                             snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
                             if (tab_bar) tabs_set_active(tab_bar, active_idx);
                             
-                            // 🔥 THE ARCHITECT FIX: Mouse மூலம் Tab மாறும்போது Force Redraw!
                             screen_force_redraw(scr);
                             needs_render = 1;
                         }
@@ -235,7 +287,6 @@ int main(int argc, char *argv[]) {
                         snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
                         if (tab_bar) tabs_set_active(tab_bar, active_idx);
                         
-                        // 🔥 THE ARCHITECT FIX: Ctrl+A மூலம் Tab மாறும்போது Force Redraw!
                         screen_force_redraw(scr);
                         needs_render = 1;
                     }
@@ -272,8 +323,6 @@ int main(int argc, char *argv[]) {
                     int status; waitpid(sessions[i].pid, &status, WNOHANG);
                     sessions[i].is_alive = 0; close(sessions[i].master_fd); sessions[i].master_fd = -1;
                     if (sessions[i].win) sessions[i].win->is_active = 0;
-                    
-                    // Session Close ஆகும்போது Force Redraw!
                     screen_force_redraw(scr);
                     needs_render = 1;
                 }
