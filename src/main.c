@@ -18,13 +18,12 @@
 #include "ui/statusbar.h"
 #include "engine/parser.h"
 #include "engine/clipboard.h"
-#include "engine/scanner.h"
 #include "engine/cursor.h"
 #include "engine/input.h"
 #include "engine/renderer.h"
 #include "engine/terminal.h"
 #include "engine/session.h"
-// 🔥 FIX: editor/edit.h நீக்கப்பட்டுவிட்டது!
+// 🔥 FIX: scanner.h மற்றும் editor/edit.h நீக்கப்பட்டுவிட்டது!
 
 #ifndef MAX_SESSIONS
 #define MAX_SESSIONS 18
@@ -99,15 +98,14 @@ int main(int argc, char *argv[]) {
     const char *default_cmd = "echo BDH Bash Multiplexer Active!\n";
     clipboard_set(engine_cb, default_cmd, strlen(default_cmd));
 
-    TokenScanner *token_scanner = scanner_create();
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
     
-    // 🔥 FIX: EditorState நீக்கப்பட்டுவிட்டது!
+    // 🔥 FIX: Scanner மற்றும் EditorState நீக்கப்பட்டுவிட்டது!
     
     statusbar_set_mode(status_bar, "NORMAL");
-    // 🔥 FIX: Ctrl+E (Edit) ஷார்ட்கட் நீக்கப்பட்டுவிட்டது!
-    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+K: Scan");
+    // 🔥 FIX: Ctrl+K (Scan) ஷார்ட்கட் நீக்கப்பட்டுவிட்டது!
+    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser");
 
     char *tab_names[MAX_SESSIONS];
     char tab_name_buffers[MAX_SESSIONS][32];
@@ -173,23 +171,7 @@ int main(int argc, char *argv[]) {
             if (nread > 0) {
                 buffer[nread] = '\0'; 
 
-                // 🔥 FIX: Ctrl+E லாஜிக் மற்றும் Editor Key handler முழுமையாக நீக்கப்பட்டுவிட்டது!
-
-                if (token_scanner && token_scanner->is_scanning_mode) {
-                    if (buffer[0] >= '1' && buffer[0] <= '9') {
-                        int token_id = buffer[0] - '0';
-                        if (scanner_copy_by_id(token_scanner, token_id, engine_cb)) {
-                            printf("\r\n\033[1;32m[BDH Scanner] Token [%d] copied to BDH & Host OS Clipboard! 🚀\033[0m\r\n", token_id);
-                        } else {
-                            printf("\r\n\033[1;31m[BDH Scanner] Invalid Token ID [%d]\033[0m\r\n", token_id);
-                        }
-                    } else {
-                        printf("\r\n[BDH Scanner] Scan cancelled.\r\n");
-                    }
-                    token_scanner->is_scanning_mode = 0;
-                    if (status_bar) statusbar_set_mode(status_bar, "NORMAL");
-                    continue;
-                }
+                // 🔥 FIX: Scanner Mode (Token ID Copying) முழுமையாக நீக்கப்பட்டுவிட்டது!
 
                 MouseEvent mouse;
                 if (strncmp(buffer, "\033[<", 3) == 0 && mouse_parse_sgr(buffer, &mouse)) {
@@ -275,20 +257,7 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                if (buffer[0] == 11 && nread == 1) { 
-                    int count = scanner_scan_screen(token_scanner, scr);
-                    if (count > 0) {
-                        token_scanner->is_scanning_mode = 1;
-                        if (status_bar) statusbar_set_mode(status_bar, "SCANNER");
-                        printf("\r\n\033[1;33m[BDH Scanner] Found %d tokens! Press 1-%d to copy, or any other key to cancel:\033[0m\r\n", count, count);
-                        for (int t = 0; t < count; t++) {
-                            printf("  \033[1;36m[%d]\033[0m %s\r\n", token_scanner->tokens[t].id, token_scanner->tokens[t].text);
-                        }
-                    } else {
-                        printf("\r\n\033[1;31m[BDH Scanner] No URLs, IPs, UUIDs, or Paths found on screen.\033[0m\r\n");
-                    }
-                    continue;
-                }
+                // 🔥 FIX: Ctrl+K (buffer[0] == 11) லாஜிக் முழுமையாக நீக்கப்பட்டுவிட்டது!
 
                 if (buffer[0] == 17 && nread == 1) {
                     engine_running = 0;
@@ -348,7 +317,6 @@ int main(int argc, char *argv[]) {
 
 render_check:
         if (needs_render) {
-            // 🔥 FIX: Editor render லாஜிக் நீக்கப்பட்டு Pure RAM Orchestration மட்டும் உள்ளது
             screen_clear(scr);
             
             if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
@@ -362,8 +330,8 @@ render_check:
         }
     }
 
-    // 🔥 FIX: editor_destroy நீக்கப்பட்டுவிட்டது!
-    sessions_cleanup_all(sessions, tab_bar, status_bar, token_scanner, engine_cb, scr);
+    // 🔥 FIX: sessions_cleanup_all -ல் இருந்து token_scanner ஆர்கியுமெண்ட் நீக்கப்பட்டுள்ளது!
+    sessions_cleanup_all(sessions, tab_bar, status_bar, engine_cb, scr);
 
     write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13);
     printf("\r\nBDH Pure Linux CLI Multiplexer Exited Cleanly.\r\n");
