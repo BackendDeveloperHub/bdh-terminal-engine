@@ -1,7 +1,7 @@
 # Makefile - BDH Pure Linux CLI Multiplexer Engine (Ultimate Multi-Env Edition)
 
 # ==============================================================================
-# 🔥 ULTIMATE OS DETECTION ENGINE (The Architect Update)
+#  ULTIMATE OS DETECTION ENGINE (The Architect Update)
 # ==============================================================================
 UNAME_S := $(shell uname -s)
 UNAME_O := $(shell uname -o 2>/dev/null || echo "Other")
@@ -76,14 +76,14 @@ all: check-os bdh-engine build-ide
 check-os:
 	@echo "================================================="
 	@echo "Auto-Detected OS : $(OS_NAME)"
-	@echo "  Selected Compiler: $(CC)"
+	@echo " Selected Compiler: $(CC)"
 	@echo "Install Path     : $(PREFIX)"
 	@echo "================================================="
 
 # 1. Build BDH Multiplexer Engine:
 bdh-engine: $(ENGINE_SRCS)
-	$(CC) $(ENGINE_SRCS) $(CFLAGS) $(LDFLAGS) -o bdh-engine
-	@echo "BDH Multiplexer Engine (bdh-engine) built successfully! "
+	PROOT_NO_SECCOMP=1 $(CC) $(ENGINE_SRCS) $(CFLAGS) $(LDFLAGS) -o bdh-engine
+	@echo "BDH Multiplexer Engine (bdh-engine) built successfully! 🚀"
 
 # 2. Build BDH Linux IDE (Recursive Make via Submodule):
 build-ide:
@@ -102,9 +102,9 @@ install: all
 		$(MAKE) -C $(IDE_DIR) install PREFIX=$(PREFIX); \
 	fi
 	@echo "=================================================================="
-	@echo " BDH Engine & IDE installed globally to $(PREFIX)/bin/ !"
-	@echo " type 'bdh-engine' to launch Multiplexer Engine!"
-	@echo " Type 'bdh-linux-ide' (or related cmds) to launch the IDE tools!"
+	@echo "BDH Engine & IDE installed globally to $(PREFIX)/bin/ !"
+	@echo "Type 'bdh-engine' to launch Multiplexer Engine!"
+	@echo "Type 'bdh-linux-ide' (or related cmds) to launch the IDE tools!"
 	@echo "=================================================================="
 
 # --- Universal System Uninstall Target ---
