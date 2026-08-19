@@ -9,7 +9,7 @@
 #include "ui/wm.h"
 #include "ui/tabs.h"
 #include "ui/statusbar.h"
-#include "engine/scanner.h"
+// 🔥 FIX: engine/scanner.h நீக்கப்பட்டுவிட்டது!
 #include "engine/clipboard.h"
 #include "engine/screen.h"
 
@@ -49,7 +49,8 @@ void sessions_init_all(TerminalSession sessions[MAX_SESSIONS], char *shell_argv[
     }
 }
 
-void sessions_cleanup_all(TerminalSession sessions[MAX_SESSIONS], TabBar *tab_bar, StatusBar *status_bar, TokenScanner *token_scanner, Clipboard *engine_cb, VirtualScreen *scr) {
+// 🔥 FIX: TokenScanner ஆர்கியுமெண்ட் நீக்கப்பட்டுவிட்டது!
+void sessions_cleanup_all(TerminalSession sessions[MAX_SESSIONS], TabBar *tab_bar, StatusBar *status_bar, Clipboard *engine_cb, VirtualScreen *scr) {
     for (int i = 0; i < MAX_SESSIONS; i++) {
         if (sessions[i].parser) parser_destroy(sessions[i].parser);
         if (sessions[i].win) {
@@ -62,7 +63,7 @@ void sessions_cleanup_all(TerminalSession sessions[MAX_SESSIONS], TabBar *tab_ba
     
     if (tab_bar) tabs_destroy(tab_bar);
     if (status_bar) statusbar_destroy(status_bar);
-    if (token_scanner) scanner_destroy(token_scanner);
+    // 🔥 FIX: scanner_destroy நீக்கப்பட்டுவிட்டது!
     if (engine_cb) clipboard_destroy(engine_cb);
     if (scr) screen_destroy(scr);
 }
