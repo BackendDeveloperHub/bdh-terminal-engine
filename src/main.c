@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Bulletproof Anti-Crash Edition)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Scrollback Integrated Edition)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -144,8 +144,6 @@ int main(int argc, char *argv[]) {
         ws.ws_row = 24; ws.ws_col = 80;
     }
     
-    // 🔥 THE ARCHITECT FIX: Hardware Limits!
-    // இயற்பியல் ஸ்க்ரீன் (Physical) எவ்வளவு சுருங்கினாலும், நமது RAM Buffer (Virtual) 18x55 க்கு கீழே சுருங்காது!
     int phys_rows = (ws.ws_row == 0) ? 24 : ws.ws_row;
     int phys_cols = (ws.ws_col == 0) ? 80 : ws.ws_col;
     
@@ -163,7 +161,7 @@ int main(int argc, char *argv[]) {
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
     statusbar_set_mode(status_bar, "NORMAL");
-    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser");
+    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | PGUP/PGDN: Scroll | Ctrl+Q: Quit");
 
     char *tab_names[MAX_SESSIONS];
     char tab_name_buffers[MAX_SESSIONS][32];
@@ -195,7 +193,6 @@ int main(int argc, char *argv[]) {
 
     while (engine_running) {
         
-        // 🔥 Responsive Resize & Anti-Crash
         if (window_resized) {
             window_resized = 0;
             
@@ -203,7 +200,6 @@ int main(int argc, char *argv[]) {
                 phys_rows = (ws.ws_row == 0) ? 24 : ws.ws_row;
                 phys_cols = (ws.ws_col == 0) ? 80 : ws.ws_col;
                 
-                // Hardware Boundary Lock
                 scr_rows = (phys_rows < 18) ? 18 : phys_rows;
                 scr_cols = (phys_cols < 55) ? 55 : phys_cols;
                 
@@ -253,6 +249,26 @@ int main(int argc, char *argv[]) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
             if (nread > 0) {
                 buffer[nread] = '\0'; 
+
+                // 🔥 SCROLLBACK CONTROL: Page Up
+                if (nread == 4 && strncmp(buffer, "\033[5~", 4) == 0) {
+                    if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                        window_scroll_view_up(sessions[active_idx].win);
+                        screen_force_redraw(scr);
+                        needs_render = 1;
+                    }
+                    continue; 
+                }
+
+                // 🔥 SCROLLBACK CONTROL: Page Down
+                if (nread == 4 && strncmp(buffer, "\033[6~", 4) == 0) {
+                    if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                        window_scroll_view_down(sessions[active_idx].win);
+                        screen_force_redraw(scr);
+                        needs_render = 1;
+                    }
+                    continue; 
+                }
 
                 MouseEvent mouse;
                 if (strncmp(buffer, "\033[<", 3) == 0 && mouse_parse_sgr(buffer, &mouse)) {
@@ -307,6 +323,13 @@ int main(int argc, char *argv[]) {
 
                 if (buffer[0] == 17 && nread == 1) { engine_running = 0; break; }
 
+                // 🔥 Auto-Reset Scroll: பயனர் வேறு ஏதேனும் டைப் செய்தால் ஸ்க்ரோல் ரீசெட் ஆகும்
+                if (sessions[active_idx].win && sessions[active_idx].win->scroll_offset > 0) {
+                    window_scroll_view_reset(sessions[active_idx].win);
+                    screen_force_redraw(scr);
+                    needs_render = 1;
+                }
+
                 if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) write(sessions[active_idx].master_fd, buffer, nread);
             }
         }
@@ -339,7 +362,6 @@ int main(int argc, char *argv[]) {
         if (needs_render) {
             screen_clear(scr);
             
-            // 🔥 PHYSICAL DISPLAY LIMIT CHECK
             if (phys_rows < 18 || phys_cols < 55) {
                 char *warn1 = " [ BDH Engine: DISPLAY TOO SMALL ] ";
                 char *warn2 = " Please Zoom Out (Pinch-in) to continue! ";
