@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Dynamic Zoom & Crash Safe)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Bulletproof Anti-Crash Edition)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -30,7 +30,6 @@
 
 volatile sig_atomic_t window_resized = 0;
 
-// 🔥 FIX: 'unused parameter' warning solved
 static void handle_sigwinch(int signo) {
     (void)signo; 
     window_resized = 1; 
@@ -70,7 +69,6 @@ static void draw_session_manager_to_screen(VirtualScreen *scr, TerminalSession s
 
     char *title = "+== [ BDH Active Sessions Manager ] ";
     for (int c = 0; c < scr->cols; c++) {
-        // 🔥 FIX: 'comparison of integers of different signs' warning solved
         if ((size_t)c < strlen(title)) screen_put_char_color(scr, start_row, c, title[c], 6);
         else if (c == scr->cols - 1) screen_put_char_color(scr, start_row, c, '+', 6);
         else screen_put_char_color(scr, start_row, c, '=', 6);
@@ -146,17 +144,16 @@ int main(int argc, char *argv[]) {
         ws.ws_row = 24; ws.ws_col = 80;
     }
     
-    int scr_rows = ws.ws_row;
-    int scr_cols = ws.ws_col;
-    if (scr_rows == 0) scr_rows = 24;
-    if (scr_cols == 0) scr_cols = 80;
-
-    // 🔥 FIX: Safe Bounds Math (Prevent Signal 11 Crash on boot)
-    int pty_rows = scr_rows - 14; 
-    if (pty_rows < 2) pty_rows = 2; // Never allow negative PTY rows
+    // 🔥 THE ARCHITECT FIX: Hardware Limits!
+    // இயற்பியல் ஸ்க்ரீன் (Physical) எவ்வளவு சுருங்கினாலும், நமது RAM Buffer (Virtual) 18x55 க்கு கீழே சுருங்காது!
+    int phys_rows = (ws.ws_row == 0) ? 24 : ws.ws_row;
+    int phys_cols = (ws.ws_col == 0) ? 80 : ws.ws_col;
     
+    int scr_rows = (phys_rows < 18) ? 18 : phys_rows;
+    int scr_cols = (phys_cols < 55) ? 55 : phys_cols;
+
+    int pty_rows = scr_rows - 14; 
     int pty_cols = scr_cols - 2;
-    if (pty_cols < 2) pty_cols = 2; // Never allow negative PTY cols
 
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
     TerminalSession sessions[MAX_SESSIONS];
@@ -175,9 +172,7 @@ int main(int argc, char *argv[]) {
         tab_names[i] = tab_name_buffers[i];
     }
 
-    // 🔥 FIX: Pass a safe initial height to prevent window_create crash in session.c
-    int safe_init_rows = (scr_rows > 14) ? scr_rows : 15; 
-    sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, safe_init_rows, tab_bar, tab_names);
+    sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
     struct winsize ws_pty;
     ws_pty.ws_row = pty_rows;
@@ -200,21 +195,20 @@ int main(int argc, char *argv[]) {
 
     while (engine_running) {
         
-        // 🔥 Termux Zoom / Resize Logic
+        // 🔥 Responsive Resize & Anti-Crash
         if (window_resized) {
             window_resized = 0;
             
             if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1) {
-                scr_rows = ws.ws_row;
-                scr_cols = ws.ws_col;
-                if (scr_rows == 0) scr_rows = 24;
-                if (scr_cols == 0) scr_cols = 80;
+                phys_rows = (ws.ws_row == 0) ? 24 : ws.ws_row;
+                phys_cols = (ws.ws_col == 0) ? 80 : ws.ws_col;
                 
-                // Safe Math for Resize
+                // Hardware Boundary Lock
+                scr_rows = (phys_rows < 18) ? 18 : phys_rows;
+                scr_cols = (phys_cols < 55) ? 55 : phys_cols;
+                
                 pty_rows = scr_rows - 14; 
-                if (pty_rows < 2) pty_rows = 2;
                 pty_cols = scr_cols - 2;
-                if (pty_cols < 2) pty_cols = 2;
                 
                 ws_pty.ws_row = pty_rows;
                 ws_pty.ws_col = pty_cols;
@@ -224,9 +218,8 @@ int main(int argc, char *argv[]) {
                         ioctl(sessions[i].master_fd, TIOCSWINSZ, &ws_pty);
                     }
                     if (sessions[i].win != NULL) {
-                        sessions[i].win->width = (scr_cols > 2) ? scr_cols : 2;
-                        int safe_h = scr_rows - 12;
-                        sessions[i].win->height = (safe_h > 2) ? safe_h : 2;
+                        sessions[i].win->width = scr_cols;
+                        sessions[i].win->height = scr_rows - 12;
                     }
                 }
                 
@@ -346,8 +339,8 @@ int main(int argc, char *argv[]) {
         if (needs_render) {
             screen_clear(scr);
             
-            // 🔥 THE ARCHITECT FIX: Dynamic Screen Size Warning!
-            if (scr_rows < 18 || scr_cols < 55) {
+            // 🔥 PHYSICAL DISPLAY LIMIT CHECK
+            if (phys_rows < 18 || phys_cols < 55) {
                 char *warn1 = " [ BDH Engine: DISPLAY TOO SMALL ] ";
                 char *warn2 = " Please Zoom Out (Pinch-in) to continue! ";
                 
@@ -357,14 +350,12 @@ int main(int argc, char *argv[]) {
                 int c2 = (scr_cols - strlen(warn2)) / 2;
                 if (c1 < 0) c1 = 0; if (c2 < 0) c2 = 0;
                 
-                // Print warning in Red and Yellow
                 for (size_t i = 0; i < strlen(warn1) && c1 + i < (size_t)scr_cols; i++) 
                     screen_put_char_color(scr, r - 1, c1 + i, warn1[i], 1); 
                 for (size_t i = 0; i < strlen(warn2) && c2 + i < (size_t)scr_cols; i++) 
                     screen_put_char_color(scr, r, c2 + i, warn2[i], 3); 
             } 
             else {
-                // Normal UI Drawing
                 if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) 
                     window_draw(scr, sessions[active_idx].win);
                 
