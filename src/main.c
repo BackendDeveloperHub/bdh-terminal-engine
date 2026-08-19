@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Shift+Arrow Scroll Integrated)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (SSH & Scroll Integrated)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -162,8 +162,8 @@ int main(int argc, char *argv[]) {
     StatusBar *status_bar = statusbar_create();
     statusbar_set_mode(status_bar, "NORMAL");
     
-    // 🔥 அப்டேட் செய்யப்பட்ட Status Bar Text
-    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Shift+Up/Dn: Scroll | Ctrl+Q: Quit");
+    // 🔥 அப்டேட் செய்யப்பட்ட Status Bar Text (SSH ஷார்ட்கட் சேர்க்கப்பட்டுள்ளது)
+    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+N: SSH | Up/Dn: Scroll | Ctrl+Q: Quit");
 
     char *tab_names[MAX_SESSIONS];
     char tab_name_buffers[MAX_SESSIONS][32];
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
             if (nread > 0) {
                 buffer[nread] = '\0'; 
 
-                // 🔥 SCROLLBACK CONTROL: Shift + Up (அல்லது Page Up, Alt+Up, Ctrl+Up)
+                // 🔥 SCROLLBACK CONTROL: Shift + Up
                 if ((nread == 4 && strncmp(buffer, "\033[5~", 4) == 0) || 
                     (nread == 6 && strncmp(buffer, "\033[1;2A", 6) == 0) || 
                     (nread == 6 && strncmp(buffer, "\033[1;3A", 6) == 0) || 
@@ -265,7 +265,7 @@ int main(int argc, char *argv[]) {
                     continue; 
                 }
 
-                // 🔥 SCROLLBACK CONTROL: Shift + Down (அல்லது Page Down, Alt+Down, Ctrl+Down)
+                // 🔥 SCROLLBACK CONTROL: Shift + Down
                 if ((nread == 4 && strncmp(buffer, "\033[6~", 4) == 0) || 
                     (nread == 6 && strncmp(buffer, "\033[1;2B", 6) == 0) || 
                     (nread == 6 && strncmp(buffer, "\033[1;3B", 6) == 0) || 
@@ -276,6 +276,92 @@ int main(int argc, char *argv[]) {
                         needs_render = 1;
                     }
                     continue; 
+                }
+
+                // 🔥 NEW SSH CONNECTION TRIGGER: Ctrl + N (ASCII 14)
+                if (buffer[0] == 14 && nread == 1) {
+                    int free_idx = -1;
+                    for (int i = 0; i < MAX_SESSIONS; i++) {
+                        if (!sessions[i].is_alive) {
+                            free_idx = i;
+                            break;
+                        }
+                    }
+
+                    if (free_idx != -1) {
+                        // 1. Status Bar-ல் Prompt காட்டுதல்
+                        statusbar_set_mode(status_bar, " SSH ");
+                        statusbar_set_text(status_bar, "Enter Target (user@ip): ", "Enter: Connect | ESC: Cancel");
+                        statusbar_draw(scr, status_bar, scr_rows - 1);
+                        screen_force_redraw(scr);
+                        renderer_draw_all(scr, sessions, MAX_SESSIONS);
+
+                        // 2. கர்சரை இன்புட் பாக்ஸில் வைப்பது
+                        char move_buf[64];
+                        snprintf(move_buf, sizeof(move_buf), "\033[%d;26H\033[?25h", scr_rows); // Column 26 for input
+                        write(STDOUT_FILENO, move_buf, strlen(move_buf));
+
+                        // 3. Mini Read-Loop for SSH Target
+                        char ssh_target[128] = {0};
+                        int t_idx = 0;
+                        
+                        while(t_idx < 127) {
+                            char ch;
+                            if (read(STDIN_FILENO, &ch, 1) == 1) {
+                                if (ch == '\r' || ch == '\n') break; // Enter pressed
+                                if (ch == 27 || ch == 3 || ch == 17) { t_idx = 0; break; } // Cancelled via ESC or Ctrl+C/Q
+                                
+                                if (ch == 127 || ch == 8) { // Backspace
+                                    if (t_idx > 0) {
+                                        t_idx--;
+                                        ssh_target[t_idx] = '\0';
+                                        write(STDOUT_FILENO, "\b \b", 3);
+                                    }
+                                } else if (ch >= 32 && ch <= 126) {
+                                    ssh_target[t_idx++] = ch;
+                                    write(STDOUT_FILENO, &ch, 1);
+                                }
+                            }
+                        }
+                        
+                        // கர்சரை மறைத்து, Status Bar-ஐ பழைய நிலைக்கு மாற்றுதல்
+                        write(STDOUT_FILENO, "\033[?25l", 6);
+                        statusbar_set_mode(status_bar, "NORMAL");
+                        statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+N: SSH | Up/Dn: Scroll | Ctrl+Q: Quit");
+
+                        // 4. புதிய PTY-ல் SSH-ஐ தொடங்குவது
+                        if (t_idx > 0) {
+                            char *ssh_argv[] = {"/usr/bin/ssh", ssh_target, NULL};
+                            
+                            // டேப் பெயரை சுருக்கமாக மாற்றுவது (e.g., root@192...)
+                            snprintf(tab_names[free_idx], 32, "%s", ssh_target);
+                            
+                            sessions[free_idx].pid = pty_spawn(ssh_argv, &sessions[free_idx].master_fd, pty_rows, pty_cols);
+                            if (sessions[free_idx].pid > 0) {
+                                sessions[free_idx].is_alive = 1;
+                                if (sessions[free_idx].win) {
+                                    window_clear(sessions[free_idx].win);
+                                    sessions[free_idx].win->cur_r = 0;
+                                    sessions[free_idx].win->cur_c = 0;
+                                }
+                                
+                                // பழைய Active Tab-ஐ Inactive ஆக்குதல்
+                                if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                                    sessions[active_idx].win->is_active = 0;
+                                    snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), "[ TAB %d/%d : %s ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+                                }
+                                
+                                // புதிய SSH Tab-ஐ Active ஆக்குதல்
+                                active_idx = free_idx;
+                                sessions[active_idx].win->is_active = 1;
+                                snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
+                                
+                                if (tab_bar) tabs_set_active(tab_bar, active_idx);
+                            }
+                        }
+                        needs_render = 1;
+                    }
+                    continue;
                 }
 
                 MouseEvent mouse;
