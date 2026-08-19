@@ -23,6 +23,7 @@
 #include "engine/renderer.h"
 #include "engine/terminal.h"
 #include "engine/session.h"
+// 🔥 FIX: scanner.h மற்றும் editor/edit.h நீக்கப்பட்டுவிட்டது!
 
 #ifndef MAX_SESSIONS
 #define MAX_SESSIONS 18
@@ -50,47 +51,6 @@ static void setup_signal_handlers() {
     sigaction(SIGTERM, &sa, NULL);
     sigaction(SIGINT,  &sa, NULL);
     sigaction(SIGABRT, &sa, NULL);
-}
-
-// 🔥 NEW: BDH Active Sessions Manager UI Logic
-static void update_session_manager_ui(FloatingWindow *mgr_win, TerminalSession sessions[], char *tab_names[], int active_idx) {
-    if (!mgr_win) return;
-    int inner_w = mgr_win->width - 2;
-    int inner_h = mgr_win->height - 2;
-    
-    // Clear background
-    for (int r = 0; r < inner_h; r++) {
-        for (int c = 0; c < inner_w; c++) {
-            mgr_win->text[r][c] = ' ';
-        }
-    }
-    
-    int r = 0;
-    int c = 2; // Left margin
-    int col_width = inner_w / 3; // 3 Columns
-    
-    for (int i = 0; i < MAX_SESSIONS; i++) {
-        char buf[64];
-        if (i == active_idx) {
-            snprintf(buf, sizeof(buf), "[%d: %s (ACTIVE)]", i + 1, tab_names[i]);
-        } else if (sessions[i].is_alive) {
-            snprintf(buf, sizeof(buf), "%d: %s (RUNNING)", i + 1, tab_names[i]);
-        } else {
-            snprintf(buf, sizeof(buf), "%d: %s (DEAD)", i + 1, tab_names[i]);
-        }
-        
-        int len = strlen(buf);
-        for(int k = 0; k < len && (c + k) < inner_w; k++) {
-            mgr_win->text[r][c + k] = buf[k];
-        }
-        
-        c += col_width;
-        if (c + 15 > inner_w) { 
-            r++;
-            c = 2;
-            if (r >= inner_h) break;
-        }
-    }
 }
 
 int main(int argc, char *argv[]) {
@@ -121,8 +81,7 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
     int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
-    // 🔥 FIX: Terminal Multiplexer-ஐ -12 ஆக குறைத்துள்ளோம்!
-    int pty_rows = scr_rows - 12; 
+    int pty_rows = scr_rows - 15;
     int pty_cols = scr_cols - 2;
 
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
@@ -142,10 +101,10 @@ int main(int argc, char *argv[]) {
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
     
-    // 🔥 NEW: BDH Active Sessions Manager Box (Height: 10, Positioned below Terminal)
-    FloatingWindow *session_mgr_win = window_create(99, 0, scr_rows - 11, scr_cols, 10, "[ BDH Active Sessions Manager ]", 0);
-
+    // 🔥 FIX: Scanner மற்றும் EditorState நீக்கப்பட்டுவிட்டது!
+    
     statusbar_set_mode(status_bar, "NORMAL");
+    // 🔥 FIX: Ctrl+K (Scan) ஷார்ட்கட் நீக்கப்பட்டுவிட்டது!
     statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser");
 
     char *tab_names[MAX_SESSIONS];
@@ -170,13 +129,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Initial Render
-    update_session_manager_ui(session_mgr_win, sessions, tab_names, active_idx);
     screen_clear(scr);
     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
         window_draw(scr, sessions[active_idx].win);
     }
-    if (session_mgr_win) window_draw(scr, session_mgr_win); // Render Manager Box
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
     if (tab_bar) render_tab_overlay(scr, tab_bar); 
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
@@ -215,6 +171,8 @@ int main(int argc, char *argv[]) {
             if (nread > 0) {
                 buffer[nread] = '\0'; 
 
+                // 🔥 FIX: Scanner Mode (Token ID Copying) முழுமையாக நீக்கப்பட்டுவிட்டது!
+
                 MouseEvent mouse;
                 if (strncmp(buffer, "\033[<", 3) == 0 && mouse_parse_sgr(buffer, &mouse)) {
                     if (mouse.row == 0 && mouse.button == MOUSE_BTN_LEFT && !mouse.is_release) {
@@ -238,13 +196,20 @@ int main(int argc, char *argv[]) {
                                      "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
 
                             if (tab_bar) tabs_set_active(tab_bar, active_idx);
-                            needs_render = 1;
+
+                            screen_clear(scr);
+                            if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                                window_draw(scr, sessions[active_idx].win);
+                            }
+                            if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+                            if (tab_bar) render_tab_overlay(scr, tab_bar);
+                            renderer_draw_all(scr, sessions, MAX_SESSIONS);
                         }
                     }
                     continue; 
                 }
 
-                if (buffer[0] == 1 && nread == 1) { // Ctrl+A
+                if (buffer[0] == 1 && nread == 1) { 
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->z_index = 0;
                         sessions[active_idx].win->is_active = 0;
@@ -267,12 +232,19 @@ int main(int argc, char *argv[]) {
                                  "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
 
                         if (tab_bar) tabs_set_active(tab_bar, active_idx);
-                        needs_render = 1;
+
+                        screen_clear(scr);
+                        if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
+                            window_draw(scr, sessions[active_idx].win);
+                        }
+                        if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
+                        if (tab_bar) render_tab_overlay(scr, tab_bar);
+                        renderer_draw_all(scr, sessions, MAX_SESSIONS);
                     }
                     continue; 
                 }
 
-                if (buffer[0] == 2 && nread == 1) { // Ctrl+B
+                if (buffer[0] == 2 && nread == 1) {
                     const char *target_url = getenv("BDH_URL");
                     if (!target_url || strlen(target_url) == 0) {
                         target_url = "https://github.com/BackendDeveloperHub";
@@ -285,7 +257,9 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
-                if (buffer[0] == 17 && nread == 1) { // Ctrl+Q
+                // 🔥 FIX: Ctrl+K (buffer[0] == 11) லாஜிக் முழுமையாக நீக்கப்பட்டுவிட்டது!
+
+                if (buffer[0] == 17 && nread == 1) {
                     engine_running = 0;
                     break;
                 }
@@ -331,8 +305,8 @@ int main(int argc, char *argv[]) {
                         for (size_t k = 0; k < strlen(exit_msg); k++) {
                             parser_feed_char(sessions[i].parser, scr, sessions[i].win, exit_msg[k]);
                         }
+                        needs_render = 1;
                     }
-                    needs_render = 1; // Re-render to show session as DEAD in manager
                 }
             }
         }
@@ -343,15 +317,12 @@ int main(int argc, char *argv[]) {
 
 render_check:
         if (needs_render) {
-            update_session_manager_ui(session_mgr_win, sessions, tab_names, active_idx);
-            
             screen_clear(scr);
             
             if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
                 window_draw(scr, sessions[active_idx].win);
             }
 
-            if (session_mgr_win) window_draw(scr, session_mgr_win); // Render Manager Box
             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
             if (tab_bar) render_tab_overlay(scr, tab_bar); 
             
@@ -359,7 +330,7 @@ render_check:
         }
     }
 
-    if (session_mgr_win) window_destroy(session_mgr_win);
+    // 🔥 FIX: sessions_cleanup_all -ல் இருந்து token_scanner ஆர்கியுமெண்ட் நீக்கப்பட்டுள்ளது!
     sessions_cleanup_all(sessions, tab_bar, status_bar, engine_cb, scr);
 
     write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13);
