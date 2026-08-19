@@ -1,5 +1,5 @@
 // src/engine/parser.c - BDH Pure Linux CLI Multiplexer ANSI/VT100 Parser (256-Color Supported)
-#include "parser.h"
+#include "engine/parser.h"
 #include <stdlib.h>
 
 AnsiParser* parser_create(void) {
@@ -103,12 +103,16 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
     int inner_w = win->width - 2;
     int inner_h = win->height - 2;
 
+    // 🔥 THE ARCHITECT FIX: The ANSI Golden Rule
+    // எப்போது 'ESC' (\033) வந்தாலும், உடனே பழைய லாஜிக்குகளை கேன்சல் செய்துவிட்டு புதிய Sequence-ஐ ஆரம்பிக்க வேண்டும்!
+    if (ch == '\033') {
+        parser->state = STATE_ESC;
+        return;
+    }
+
     switch (parser->state) {
         case STATE_NORMAL:
-            if (ch == '\033') { 
-                parser->state = STATE_ESC;
-            } 
-            else if (ch == '\r') {
+            if (ch == '\r') {
                 win->cur_c = 0;
             } 
             else if (ch == '\n') {
@@ -126,7 +130,6 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 if (win->cur_c >= inner_w) win->cur_c = inner_w - 1;
             }
             else if ((unsigned char)ch >= 32 && ch != 127) {
-                // 🔥 FIXED: இப்போது 5 ஆர்கியுமெண்ட்கள் சரியாக அனுப்பப்படும்!
                 window_put_char(scr, win, ch, parser->current_fg, parser->current_bg); 
             }
             break;
@@ -149,6 +152,10 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
             else if (ch == 'M') {
                 win->cur_r--;
                 if (win->cur_r < 0) { parser_scroll_down(win, 1); win->cur_r = 0; }
+                parser->state = STATE_NORMAL;
+            }
+            else if (ch == '\\') {
+                // 🔥 FIX: OSC String Terminator (\033\) சப்போர்ட்!
                 parser->state = STATE_NORMAL;
             }
             else parser->state = STATE_NORMAL;
@@ -203,11 +210,10 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                 else if (ch == 'S') parser_scroll_up(win, n);
                 else if (ch == 'T') parser_scroll_down(win, n);
                 
-                // 🔥 NEW: ANSI Color Parsing Magic ('m' Command)
                 else if (ch == 'm') {
                     if (parser->arg_count == 0) {
-                        parser->current_fg = 7; // Reset to White
-                        parser->current_bg = 0; // Reset to Black
+                        parser->current_fg = 7;
+                        parser->current_bg = 0;
                     } else {
                         for (int i = 0; i < parser->arg_count; i++) {
                             int code = parser->args[i];
@@ -219,19 +225,17 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                             } else if (code >= 40 && code <= 47) {
                                 parser->current_bg = code - 40;
                             } else if (code == 38) {
-                                // 256 Color Foreground: 38;5;X
                                 if (i + 2 < parser->arg_count && parser->args[i+1] == 5) {
                                     parser->current_fg = parser->args[i+2];
                                     i += 2;
                                 }
                             } else if (code == 48) {
-                                // 256 Color Background: 48;5;X
                                 if (i + 2 < parser->arg_count && parser->args[i+1] == 5) {
                                     parser->current_bg = parser->args[i+2];
                                     i += 2;
                                 }
                             } else if (code >= 90 && code <= 97) {
-                                parser->current_fg = (code - 90) + 8; // Bright fg
+                                parser->current_fg = (code - 90) + 8;
                             }
                         }
                     }
@@ -251,6 +255,9 @@ void parser_feed_char(AnsiParser *parser, VirtualScreen *scr, FloatingWindow *wi
                         for (int r = win->cur_r + 1; r < inner_h; r++)
                             for (int c = 0; c < inner_w; c++) win->text[r][c] = ' ';
                     }
+                }
+                else if (ch == 'h' || ch == 'l') {
+                    // 🔥 FIX: Set/Reset Mode கமாண்டுகளைச் (எ.கா: ?2004h, ?2004l) சத்தமில்லாமல் விழுங்கிவிடுகிறோம்!
                 }
 
                 parser->state = STATE_NORMAL;
