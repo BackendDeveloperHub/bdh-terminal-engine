@@ -53,6 +53,73 @@ static void setup_signal_handlers() {
     sigaction(SIGABRT, &sa, NULL);
 }
 
+// 🔥 THE ARCHITECT FIX: Direct Native Overlay Rendering (Bypasses Window Manager Bugs!)
+static void draw_session_manager_direct(TerminalSession sessions[], char *tab_names[], int active_idx, int scr_cols, int scr_rows) {
+    int start_row = scr_rows - 11; // Status bar is at scr_rows - 1, Manager takes 11 rows
+    if (start_row < 2) return; 
+    
+    char out[8192];
+    int len = 0;
+    
+    // Move cursor to start_row
+    len += snprintf(out + len, sizeof(out) - len, "\033[%d;1H", start_row);
+    
+    // Top border
+    len += snprintf(out + len, sizeof(out) - len, "\033[1;36m+== [ BDH Active Sessions Manager ] ");
+    int title_len = 36;
+    for(int i = title_len; i < scr_cols - 1; i++) out[len++] = '=';
+    out[len++] = '+';
+    len += snprintf(out + len, sizeof(out) - len, "\033[0m\r\n");
+    
+    // 3 columns layout for 9 rows
+    int col_width = (scr_cols - 4) / 3;
+    if (col_width < 15) col_width = 15;
+    
+    int session_idx = 0;
+    for (int r = 0; r < 9; r++) {
+        len += snprintf(out + len, sizeof(out) - len, "\033[1;36m|\033[0m ");
+        int chars_printed_in_row = 1; 
+        
+        for (int c = 0; c < 3; c++) {
+            int text_len = 0;
+            if (session_idx < MAX_SESSIONS) {
+                char dummy[128];
+                if (session_idx == active_idx) {
+                    text_len = snprintf(dummy, sizeof(dummy), "[%d: %s (ACTIVE)]", session_idx + 1, tab_names[session_idx]);
+                    len += snprintf(out + len, sizeof(out) - len, "\033[1;32m%s\033[0m", dummy);
+                } else if (sessions[session_idx].is_alive) {
+                    text_len = snprintf(dummy, sizeof(dummy), "%d: %s (RUNNING)", session_idx + 1, tab_names[session_idx]);
+                    len += snprintf(out + len, sizeof(out) - len, "\033[1;33m%s\033[0m", dummy);
+                } else {
+                    text_len = snprintf(dummy, sizeof(dummy), "%d: %s (DEAD)", session_idx + 1, tab_names[session_idx]);
+                    len += snprintf(out + len, sizeof(out) - len, "\033[1;31m%s\033[0m", dummy);
+                }
+                session_idx++;
+            }
+            
+            int padding = col_width - text_len;
+            if (padding < 0) padding = 0;
+            if (c == 2) {
+                int current_col_pos = chars_printed_in_row + text_len;
+                padding = (scr_cols - 2) - current_col_pos; 
+                if (padding < 0) padding = 0;
+            }
+            
+            for(int p = 0; p < padding; p++) out[len++] = ' ';
+            chars_printed_in_row += text_len + padding;
+        }
+        len += snprintf(out + len, sizeof(out) - len, "\033[1;36m|\033[0m\r\n");
+    }
+    
+    // Bottom border
+    len += snprintf(out + len, sizeof(out) - len, "\033[1;36m+");
+    for(int i = 1; i < scr_cols - 1; i++) out[len++] = '=';
+    out[len++] = '+';
+    len += snprintf(out + len, sizeof(out) - len, "\033[0m"); 
+    
+    write(STDOUT_FILENO, out, len);
+}
+
 int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
@@ -81,7 +148,8 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
     int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
-    int pty_rows = scr_rows - 15;
+    // 🔥 FIX: Terminal Multiplexer-ன் உயரத்தை -13 ஆக குறைத்துள்ளோம் (Manager Box-க்காக)
+    int pty_rows = scr_rows - 13; 
     int pty_cols = scr_cols - 2;
 
     VirtualScreen *scr = screen_create(scr_rows, scr_cols);
@@ -101,10 +169,7 @@ int main(int argc, char *argv[]) {
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
     
-    // 🔥 FIX: Scanner மற்றும் EditorState நீக்கப்பட்டுவிட்டது!
-    
     statusbar_set_mode(status_bar, "NORMAL");
-    // 🔥 FIX: Ctrl+K (Scan) ஷார்ட்கட் நீக்கப்பட்டுவிட்டது!
     statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser");
 
     char *tab_names[MAX_SESSIONS];
@@ -136,6 +201,8 @@ int main(int argc, char *argv[]) {
     if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
     if (tab_bar) render_tab_overlay(scr, tab_bar); 
     renderer_draw_all(scr, sessions, MAX_SESSIONS);
+    // Initial Render
+    draw_session_manager_direct(sessions, tab_names, active_idx, scr_cols, scr_rows);
 
     fd_set read_fds;
     char buffer[16384];
@@ -171,8 +238,6 @@ int main(int argc, char *argv[]) {
             if (nread > 0) {
                 buffer[nread] = '\0'; 
 
-                // 🔥 FIX: Scanner Mode (Token ID Copying) முழுமையாக நீக்கப்பட்டுவிட்டது!
-
                 MouseEvent mouse;
                 if (strncmp(buffer, "\033[<", 3) == 0 && mouse_parse_sgr(buffer, &mouse)) {
                     if (mouse.row == 0 && mouse.button == MOUSE_BTN_LEFT && !mouse.is_release) {
@@ -197,13 +262,7 @@ int main(int argc, char *argv[]) {
 
                             if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
-                            screen_clear(scr);
-                            if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
-                                window_draw(scr, sessions[active_idx].win);
-                            }
-                            if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
-                            if (tab_bar) render_tab_overlay(scr, tab_bar);
-                            renderer_draw_all(scr, sessions, MAX_SESSIONS);
+                            needs_render = 1;
                         }
                     }
                     continue; 
@@ -233,13 +292,7 @@ int main(int argc, char *argv[]) {
 
                         if (tab_bar) tabs_set_active(tab_bar, active_idx);
 
-                        screen_clear(scr);
-                        if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
-                            window_draw(scr, sessions[active_idx].win);
-                        }
-                        if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
-                        if (tab_bar) render_tab_overlay(scr, tab_bar);
-                        renderer_draw_all(scr, sessions, MAX_SESSIONS);
+                        needs_render = 1;
                     }
                     continue; 
                 }
@@ -256,8 +309,6 @@ int main(int argc, char *argv[]) {
                     }
                     continue;
                 }
-
-                // 🔥 FIX: Ctrl+K (buffer[0] == 11) லாஜிக் முழுமையாக நீக்கப்பட்டுவிட்டது!
 
                 if (buffer[0] == 17 && nread == 1) {
                     engine_running = 0;
@@ -327,10 +378,12 @@ render_check:
             if (tab_bar) render_tab_overlay(scr, tab_bar); 
             
             renderer_draw_all(scr, sessions, MAX_SESSIONS);
+
+            // 🔥 NEW: Draw Manager UI Directly!
+            draw_session_manager_direct(sessions, tab_names, active_idx, scr_cols, scr_rows);
         }
     }
 
-    // 🔥 FIX: sessions_cleanup_all -ல் இருந்து token_scanner ஆர்கியுமெண்ட் நீக்கப்பட்டுள்ளது!
     sessions_cleanup_all(sessions, tab_bar, status_bar, engine_cb, scr);
 
     write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13);
