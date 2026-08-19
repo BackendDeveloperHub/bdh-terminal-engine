@@ -52,23 +52,22 @@ static void setup_signal_handlers() {
     sigaction(SIGABRT, &sa, NULL);
 }
 
-// 🔥 Direct Native Overlay Rendering
+// 🔥 THE ARCHITECT FIX: Direct Native Overlay Rendering (No Newlines & Scroll Bug Fixed!)
 static void draw_session_manager_direct(TerminalSession sessions[], char *tab_names[], int active_idx, int scr_cols, int scr_rows) {
-    int start_row = scr_rows - 11; // Status bar is at scr_rows - 1, Manager takes 11 rows
+    int start_row = scr_rows - 11; 
     if (start_row < 2) return; 
     
     char out[8192];
     int len = 0;
+    int cur_r = start_row;
     
-    // Move cursor to start_row
-    len += snprintf(out + len, sizeof(out) - len, "\033[%d;1H", start_row);
-    
-    // Top border
+    // Top border (NO \r\n)
+    len += snprintf(out + len, sizeof(out) - len, "\033[%d;1H", cur_r++);
     len += snprintf(out + len, sizeof(out) - len, "\033[1;36m+== [ BDH Active Sessions Manager ] ");
     int title_len = 36;
     for(int i = title_len; i < scr_cols - 1; i++) out[len++] = '=';
     out[len++] = '+';
-    len += snprintf(out + len, sizeof(out) - len, "\033[0m\r\n");
+    len += snprintf(out + len, sizeof(out) - len, "\033[0m");
     
     // 3 columns layout for 9 rows
     int col_width = (scr_cols - 4) / 3;
@@ -76,6 +75,8 @@ static void draw_session_manager_direct(TerminalSession sessions[], char *tab_na
     
     int session_idx = 0;
     for (int r = 0; r < 9; r++) {
+        // Move cursor directly to the next row (NO \r\n)
+        len += snprintf(out + len, sizeof(out) - len, "\033[%d;1H", cur_r++);
         len += snprintf(out + len, sizeof(out) - len, "\033[1;36m|\033[0m ");
         int chars_printed_in_row = 1; 
         
@@ -107,10 +108,11 @@ static void draw_session_manager_direct(TerminalSession sessions[], char *tab_na
             for(int p = 0; p < padding; p++) out[len++] = ' ';
             chars_printed_in_row += text_len + padding;
         }
-        len += snprintf(out + len, sizeof(out) - len, "\033[1;36m|\033[0m\r\n");
+        len += snprintf(out + len, sizeof(out) - len, "\033[1;36m|\033[0m");
     }
     
-    // Bottom border
+    // Bottom border (NO \r\n)
+    len += snprintf(out + len, sizeof(out) - len, "\033[%d;1H", cur_r++);
     len += snprintf(out + len, sizeof(out) - len, "\033[1;36m+");
     for(int i = 1; i < scr_cols - 1; i++) out[len++] = '=';
     out[len++] = '+';
@@ -380,12 +382,10 @@ render_check:
             draw_session_manager_direct(sessions, tab_names, active_idx, scr_cols, scr_rows);
 
             // 🔥 THE ARCHITECT FIX: RESTORE CURSOR POSITION!
-            // கர்சரை மீண்டும் கமாண்ட் பிராம்ப்ட்-ல் (Active Terminal) வைக்கிறோம்.
             if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
                 int cursor_r = sessions[active_idx].win->y + 2 + sessions[active_idx].win->cur_r;
                 int cursor_c = sessions[active_idx].win->x + 2 + sessions[active_idx].win->cur_c;
                 char cursor_restore[32];
-                // \033[%d;%dH -> கர்சரை குறிப்பிட்ட இடத்திற்கு நகர்த்தும் ANSI கோட்
                 int cr_len = snprintf(cursor_restore, sizeof(cursor_restore), "\033[%d;%dH", cursor_r, cursor_c);
                 write(STDOUT_FILENO, cursor_restore, cr_len);
             }
