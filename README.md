@@ -9,7 +9,7 @@
 
 Built specifically for backend developers, systems engineers, and CLI enthusiasts.
 
-[![License: MIT](https://img.shields.io/badge/License-GUI-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-GNU GENERAL PUBLIC LICENSE-yellow.svg)](LICENSE)
 ![Language](https://img.shields.io/badge/Language-C-blue.svg)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Termux%20%7C%20macOS-lightgrey.svg)
 ![Zero Dependencies](https://img.shields.io/badge/GUI%20Deps-Zero-brightgreen.svg)
