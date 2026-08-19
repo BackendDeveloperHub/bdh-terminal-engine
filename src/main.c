@@ -1,6 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (Ultra-Stable Architecture)
-// Written for BackendDeveloperHub (12 Default / 18 Max Sessions)
-
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (100% Stable UI Architecture)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,7 +10,6 @@
 #include <sys/wait.h>
 #include <errno.h>
 
-// BDH Engine Headers
 #include "engine/pty.h"
 #include "engine/screen.h"
 #include "ui/panes.h"
@@ -31,14 +28,11 @@
 #define MAX_SESSIONS 18
 #endif
 
-// =======================================================================================
-// 1. FATAL SIGNAL HANDLERS (சிஸ்டம் க்ராஷ் ஆனால் டெர்மினலை பத்திரமாக மீட்கும் லாஜிக்)
-// =======================================================================================
 static void fatal_signal_handler(int signo) {
     write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13);
     terminal_disable_raw_mode();
     char msg[128];
-    int len = snprintf(msg, sizeof(msg), "\r\n[BDH Engine] Fatal error: Caught signal %d. Restored terminal safely.\r\n", signo);
+    int len = snprintf(msg, sizeof(msg), "\r\n[BDH Engine] Fatal error: Caught signal %d.\r\n", signo);
     write(STDOUT_FILENO, msg, len);
     _exit(EXIT_FAILURE);
 }
@@ -48,22 +42,16 @@ static void setup_signal_handlers() {
     sa.sa_handler = fatal_signal_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    sigaction(SIGSEGV, &sa, NULL); // Segmentation Fault
-    sigaction(SIGTERM, &sa, NULL); // Termination
-    sigaction(SIGINT,  &sa, NULL); // Ctrl+C Exception
-    sigaction(SIGABRT, &sa, NULL); // Abort
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT,  &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
 }
 
-// =======================================================================================
-// 2. UI ARCHITECTURE: VIRTUAL SCREEN RENDERER (ஸ்க்ரோல் பக் வராமல் தடுக்கும் கவச லாஜிக்)
-// =======================================================================================
 static void draw_session_manager_to_screen(VirtualScreen *scr, TerminalSession sessions[], char *tab_names[], int active_idx) {
-    // டெர்மினல் உயரம் மிகச் சிறிதாக இருந்தால் Manager-ஐ வரைய வேண்டாம் (Safety Check)
-    if (scr->rows < 16) return; 
+    int start_row = scr->rows - 12; 
+    if (start_row < 2) return; 
 
-    int start_row = scr->rows - 12; // டெர்மினல் விண்டோவுக்குக் கீழே ஆரம்பிக்கிறது
-
-    // Top Border (Cyan = 6)
     char *title = "+== [ BDH Active Sessions Manager ] ";
     for (int c = 0; c < scr->cols; c++) {
         if (c < strlen(title)) screen_put_char_color(scr, start_row, c, title[c], 6);
@@ -75,7 +63,6 @@ static void draw_session_manager_to_screen(VirtualScreen *scr, TerminalSession s
     if (col_width < 15) col_width = 15;
     int session_idx = 0;
 
-    // 3 Columns Layout (9 Rows)
     for (int r = 0; r < 9; r++) {
         int cur_row = start_row + 1 + r;
         screen_put_char_color(scr, cur_row, 0, '|', 6);
@@ -84,18 +71,18 @@ static void draw_session_manager_to_screen(VirtualScreen *scr, TerminalSession s
         for (int c = 0; c < 3; c++) {
             int text_len = 0;
             char dummy[128];
-            int color = 7; // Default White
+            int color = 7; 
 
             if (session_idx < MAX_SESSIONS) {
                 if (session_idx == active_idx) {
                     text_len = snprintf(dummy, sizeof(dummy), "[%d: %s (ACTIVE)]", session_idx + 1, tab_names[session_idx]);
-                    color = 2; // Green
+                    color = 2; 
                 } else if (sessions[session_idx].is_alive) {
                     text_len = snprintf(dummy, sizeof(dummy), "%d: %s (RUNNING)", session_idx + 1, tab_names[session_idx]);
-                    color = 3; // Yellow
+                    color = 3; 
                 } else {
                     text_len = snprintf(dummy, sizeof(dummy), "%d: %s (DEAD)", session_idx + 1, tab_names[session_idx]);
-                    color = 1; // Red
+                    color = 1; 
                 }
                 session_idx++;
             }
@@ -114,7 +101,6 @@ static void draw_session_manager_to_screen(VirtualScreen *scr, TerminalSession s
         screen_put_char_color(scr, cur_row, scr->cols - 1, '|', 6);
     }
 
-    // Bottom Border
     int bottom_row = start_row + 10;
     if (bottom_row < scr->rows) {
         screen_put_char_color(scr, bottom_row, 0, '+', 6);
@@ -123,9 +109,6 @@ static void draw_session_manager_to_screen(VirtualScreen *scr, TerminalSession s
     }
 }
 
-// =======================================================================================
-// 3. MAIN MULTIPLEXER ENGINE
-// =======================================================================================
 int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
@@ -147,7 +130,6 @@ int main(int argc, char *argv[]) {
     int scr_rows = (ws.ws_row > 10) ? ws.ws_row : 24;
     int scr_cols = (ws.ws_col > 20) ? ws.ws_col : 80;
 
-    // PTY மற்றும் விண்டோ அளவீடுகள்
     int pty_rows = scr_rows - 14; 
     int pty_cols = scr_cols - 2;
 
@@ -159,7 +141,7 @@ int main(int argc, char *argv[]) {
     TabBar *tab_bar = tabs_create();
     StatusBar *status_bar = statusbar_create();
     statusbar_set_mode(status_bar, "NORMAL");
-    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser | Ctrl+Q: Quit");
+    statusbar_set_text(status_bar, "[ BDH Linux Multiplexer ]", "Ctrl+A: Tab | Ctrl+B: Browser");
 
     char *tab_names[MAX_SESSIONS];
     char tab_name_buffers[MAX_SESSIONS][32];
@@ -168,7 +150,6 @@ int main(int argc, char *argv[]) {
         tab_names[i] = tab_name_buffers[i];
     }
 
-    // Sessions Initialization
     sessions_init_all(sessions, shell_argv, pty_rows, pty_cols, scr_cols, scr_rows, tab_bar, tab_names);
 
     struct winsize ws_pty;
@@ -188,11 +169,8 @@ int main(int argc, char *argv[]) {
     ssize_t nread;
     int max_fd = 0;
     int engine_running = 1;
-    int needs_render = 1; // முதல் முறையாக ஸ்க்ரீனை ரெண்டர் செய்ய 1-ல் வைக்க வேண்டும்
+    int needs_render = 1; 
 
-    // =======================================================================================
-    // 4. CORE EVENT LOOP (அதிவேக I/O Multiplexing)
-    // =======================================================================================
     while (engine_running) {
         FD_ZERO(&read_fds);
         FD_SET(STDIN_FILENO, &read_fds);
@@ -213,83 +191,70 @@ int main(int argc, char *argv[]) {
 
         needs_render = 0;
 
-        // --- STDIN (கீபோர்டு & மவுஸ் உள்ளீடுகள்) ---
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
             nread = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
             if (nread > 0) {
                 buffer[nread] = '\0'; 
 
-                // Mouse Event Handling (Tab Switching)
                 MouseEvent mouse;
                 if (strncmp(buffer, "\033[<", 3) == 0 && mouse_parse_sgr(buffer, &mouse)) {
                     if (mouse.row == 0 && mouse.button == MOUSE_BTN_LEFT && !mouse.is_release) {
                         int tab_width = scr_cols / MAX_SESSIONS;
                         if (tab_width < 1) tab_width = 1;
                         int clicked_tab = mouse.col / tab_width; 
-                        
                         if (clicked_tab >= 0 && clicked_tab < MAX_SESSIONS && sessions[clicked_tab].is_alive && sessions[clicked_tab].win != NULL) {
                             sessions[active_idx].win->is_active = 0;
                             snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), "[ TAB %d/%d : %s ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
-                            
                             active_idx = clicked_tab;
                             sessions[active_idx].win->is_active = 1;
                             snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
-                            
                             if (tab_bar) tabs_set_active(tab_bar, active_idx);
+                            
+                            // 🔥 THE ARCHITECT FIX: Mouse மூலம் Tab மாறும்போது Force Redraw!
+                            screen_force_redraw(scr);
                             needs_render = 1;
                         }
                     }
                     continue; 
                 }
 
-                // Ctrl+A : Tab Switching
                 if (buffer[0] == 1 && nread == 1) { 
                     if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win != NULL) {
                         sessions[active_idx].win->is_active = 0;
                         snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), "[ TAB %d/%d : %s ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
                     }
-                    
                     int next_idx = (active_idx + 1) % MAX_SESSIONS;
                     int attempts = 0;
                     while (attempts < MAX_SESSIONS && (!sessions[next_idx].is_alive || sessions[next_idx].win == NULL)) {
                         next_idx = (next_idx + 1) % MAX_SESSIONS;
                         attempts++;
                     }
-                    
                     if (sessions[next_idx].is_alive && sessions[next_idx].win != NULL) {
                         active_idx = next_idx;
                         sessions[active_idx].win->is_active = 1;
                         snprintf(sessions[active_idx].win->title, sizeof(sessions[active_idx].win->title), "[ TAB %d/%d : %s (ACTIVE) * ]", active_idx + 1, MAX_SESSIONS, tab_names[active_idx]);
                         if (tab_bar) tabs_set_active(tab_bar, active_idx);
+                        
+                        // 🔥 THE ARCHITECT FIX: Ctrl+A மூலம் Tab மாறும்போது Force Redraw!
+                        screen_force_redraw(scr);
                         needs_render = 1;
                     }
                     continue; 
                 }
 
-                // Ctrl+B : Web Browser 
                 if (buffer[0] == 2 && nread == 1) {
                     char browser_cmd[512];
                     snprintf(browser_cmd, sizeof(browser_cmd), "links https://github.com/BackendDeveloperHub\n");
-                    if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
-                        write(sessions[active_idx].master_fd, browser_cmd, strlen(browser_cmd));
-                    }
+                    if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) write(sessions[active_idx].master_fd, browser_cmd, strlen(browser_cmd));
                     continue;
                 }
 
-                // Ctrl+Q : Quit Engine 
-                if (buffer[0] == 17 && nread == 1) { 
-                    engine_running = 0; 
-                    break; 
-                }
+                if (buffer[0] == 17 && nread == 1) { engine_running = 0; break; }
 
-                // Active PTY-க்கு உள்ளீட்டை அனுப்புதல்
-                if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) {
-                    write(sessions[active_idx].master_fd, buffer, nread);
-                }
+                if (sessions[active_idx].is_alive && sessions[active_idx].master_fd >= 0) write(sessions[active_idx].master_fd, buffer, nread);
             }
         }
 
-        // --- PTY OUTPUT (டெர்மினல் அவுட்புட் வாசிப்பு) ---
         int active_sessions_count = 0;
         for (int i = 0; i < MAX_SESSIONS; i++) {
             if (!sessions[i].is_alive || sessions[i].master_fd < 0) continue;
@@ -299,20 +264,17 @@ int main(int argc, char *argv[]) {
                 nread = read(sessions[i].master_fd, buffer, sizeof(buffer));
                 if (nread > 0) {
                     if (sessions[i].win != NULL && sessions[i].parser != NULL) {
-                        for (int k = 0; k < nread; k++) {
-                            parser_feed_char(sessions[i].parser, scr, sessions[i].win, buffer[k]);
-                        }
+                        for (int k = 0; k < nread; k++) parser_feed_char(sessions[i].parser, scr, sessions[i].win, buffer[k]);
                         if (i == active_idx) needs_render = 1;
                     }
                 } 
                 else if (nread == 0 || errno == EIO) {
-                    // செஷன் க்ளோஸ் ஆனால் (Exit)
-                    int status; 
-                    waitpid(sessions[i].pid, &status, WNOHANG);
-                    sessions[i].is_alive = 0; 
-                    close(sessions[i].master_fd); 
-                    sessions[i].master_fd = -1;
+                    int status; waitpid(sessions[i].pid, &status, WNOHANG);
+                    sessions[i].is_alive = 0; close(sessions[i].master_fd); sessions[i].master_fd = -1;
                     if (sessions[i].win) sessions[i].win->is_active = 0;
+                    
+                    // Session Close ஆகும்போது Force Redraw!
+                    screen_force_redraw(scr);
                     needs_render = 1;
                 }
             }
@@ -320,34 +282,21 @@ int main(int argc, char *argv[]) {
 
         if (active_sessions_count == 0) break;
 
-        // =======================================================================================
-        // 5. THE RENDER PIPELINE (மாயாஜாலம் நடக்கும் இடம்)
-        // =======================================================================================
         if (needs_render) {
             screen_clear(scr);
+            if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) window_draw(scr, sessions[active_idx].win);
             
-            // 1. விண்டோவை வரைகிறோம்
-            if (active_idx >= 0 && active_idx < MAX_SESSIONS && sessions[active_idx].win) {
-                window_draw(scr, sessions[active_idx].win);
-            }
-            
-            // 2. Manager பாக்ஸை வரைகிறோம் (Virtual Screen-க்குள்)
             draw_session_manager_to_screen(scr, sessions, tab_names, active_idx);
             
-            // 3. Status Bar & Tabs வரைகிறோம்
             if (status_bar) statusbar_draw(scr, status_bar, scr_rows - 1);
             if (tab_bar) render_tab_overlay(scr, tab_bar); 
             
-            // 4. மொத்தத்தையும் Delta Render மூலம் டெர்மினலுக்கு அனுப்புகிறோம்!
             renderer_draw_all(scr, sessions, MAX_SESSIONS); 
         }
     }
 
-    // =======================================================================================
-    // 6. GRACEFUL CLEANUP (மெமரி லீக் இல்லாமல் வெளியேறுதல்)
-    // =======================================================================================
     sessions_cleanup_all(sessions, tab_bar, status_bar, engine_cb, scr);
-    write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13); // Exit Alternative Screen
-    printf("\r\n[BDH Engine] Multiplexer Exited Cleanly. Keep Building!\r\n");
+    write(STDOUT_FILENO, "\033[?1049l\033[?7h", 13);
+    printf("\r\nBDH Pure Linux CLI Multiplexer Exited Cleanly.\r\n");
     return EXIT_SUCCESS;
 }
