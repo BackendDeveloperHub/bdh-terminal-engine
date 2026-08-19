@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ BDH Terminal Engine
+#  BDH Terminal Engine
 
 ### `bdh-terminal-engine`
 
@@ -9,20 +9,20 @@
 
 Built specifically for backend developers, systems engineers, and CLI enthusiasts.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-GUI-yellow.svg)](LICENSE)
 ![Language](https://img.shields.io/badge/Language-C-blue.svg)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Termux%20%7C%20macOS-lightgrey.svg)
 ![Zero Dependencies](https://img.shields.io/badge/GUI%20Deps-Zero-brightgreen.svg)
 ![Build](https://img.shields.io/badge/Build-Makefile-orange.svg)
 
-<!-- 📸 Screenshot / GIF demo placeholder — add before publishing -->
+<!-- 📸Screenshot / GIF demo placeholder — add before publishing -->
 <!-- <img src="docs/demo.gif" alt="BDH Terminal Engine Demo" width="800"/> -->
 
 </div>
 
 ---
 
-## 📌 Overview
+##  Overview
 
 **BDH Terminal Engine** is a lightweight, high-performance terminal multiplexer inspired by tools like `tmux` and `GNU screen`, bundled with a built-in, standalone modal text editor.
 
@@ -30,23 +30,23 @@ Architected from the ground up to interact directly with Linux kernel pseudo-ter
 
 ---
 
-## 🔥 Key Features
+## Key Features
 
 | | Feature |
 |---|---|
-| 🖥️ | **True Multi-Tab & Multi-Shell Multiplexing** — Spawn and manage multiple concurrent `/bin/zsh` or `/bin/bash` PTY sessions inside a single terminal window with instant keyboard and mouse switching. |
-| 📝 | **Built-in & Standalone Modal Text Editor (`bdh-edit`)** — A fully functional, lightweight VT100 text editor. Launch it standalone via `bdh-edit <filename>` from any shell, or toggle it instantly inside the multiplexer with `Ctrl + E` — complete with a blinking block cursor (█) and clean alternate-screen isolation. |
-| 📱 | **Responsive Multi-Platform Capacity** — Linux Desktop/Server Mode supports up to **18** concurrent sessions (`MAX_SESSIONS 18`); Termux/Mobile Mode is optimized for **8** concurrent sessions (`MAX_SESSIONS 8`) for a clutter-free mobile layout. |
-| 🐭 | **XTerm SGR Mouse Protocol Support** — Click directly on any tab in the top badge or footer overlay to switch active sessions instantly, no keyboard required. |
-| 🔍 | **Built-in Token Scanner (`Ctrl + K`)** — Dynamically scan the entire screen for URLs, IP addresses, UUIDs, and file paths, and copy them straight to your clipboard. |
-| 🌐 | **Pure CLI Web Browser Integration** — Browse documentation, GitHub repos, and websites inside your active tab, rendered in sharp, glitch-free ASCII/VT100 text mode (`Ctrl + B`). |
-| ⚡ | **Non-Blocking Asynchronous I/O & Zero-Gap Footer** — Powered by a responsive `select()` event loop with a 10ms timeout for zero input latency, with a permanent, zero-gap Active Sessions Manager footer. |
-| 🛡️ | **16KB Anti-Glitch & Anti-Tearing Buffer** — A high-capacity 16,384-byte I/O buffer eliminates screen tearing, flickering, and ghosting during heavy stdout bursts or full-screen browser layouts. |
-| 📦 | **Lightweight & Zero Bloat** — Compiles to tiny binaries (`bdh-engine` and `bdh-edit`). No X11, Wayland, GTK, or WebKit dependencies — runs flawlessly on servers, SSH sessions, TTYs, Termux, and Linux desktops. |
+|  | **True Multi-Tab & Multi-Shell Multiplexing** — Spawn and manage multiple concurrent `/bin/zsh` or `/bin/bash` PTY sessions inside a single terminal window with instant keyboard and mouse switching. |
+| | **Built-in & Standalone Modal Text Editor (`bdh-edit`)** — A fully functional, lightweight VT100 text editor. Launch it standalone via `bdh-edit <filename>` from any shell, or toggle it instantly inside the multiplexer with `Ctrl + E` — complete with a blinking block cursor (█) and clean alternate-screen isolation. |
+| | **Responsive Multi-Platform Capacity** — Linux Desktop/Server Mode supports up to **18** concurrent sessions (`MAX_SESSIONS 18`); Termux/Mobile Mode is optimized for **8** concurrent sessions (`MAX_SESSIONS 8`) for a clutter-free mobile layout. |
+| | **XTerm SGR Mouse Protocol Support** — Click directly on any tab in the top badge or footer overlay to switch active sessions instantly, no keyboard required. |
+|  | **Built-in Token Scanner (`Ctrl + K`)** — Dynamically scan the entire screen for URLs, IP addresses, UUIDs, and file paths, and copy them straight to your clipboard. |
+| | **Pure CLI Web Browser Integration** — Browse documentation, GitHub repos, and websites inside your active tab, rendered in sharp, glitch-free ASCII/VT100 text mode (`Ctrl + B`). |
+|  | **Non-Blocking Asynchronous I/O & Zero-Gap Footer** — Powered by a responsive `select()` event loop with a 10ms timeout for zero input latency, with a permanent, zero-gap Active Sessions Manager footer. |
+|  | **16KB Anti-Glitch & Anti-Tearing Buffer** — A high-capacity 16,384-byte I/O buffer eliminates screen tearing, flickering, and ghosting during heavy stdout bursts or full-screen browser layouts. |
+| | **Lightweight & Zero Bloat** — Compiles to tiny binaries (`bdh-engine` and `bdh-edit`). No X11, Wayland, GTK, or WebKit dependencies — runs flawlessly on servers, SSH sessions, TTYs, Termux, and Linux desktops. |
 
 ---
 
-## 🏗️ Modular Architecture
+##  Modular Architecture
 
 The engine is structured into clean, decoupled C modules for maintainability and extensibility:
 
@@ -102,7 +102,7 @@ make clean && make && sudo make install
 
 ---
 
-## 🚀 Usage
+## Usage
 
 ### 1. Start the Multiplexer Engine
 
@@ -122,7 +122,7 @@ bdh-edit filename.txt
 
 ---
 
-## ⌨️ Controls & Keybindings
+## Controls & Keybindings
 
 | Shortcut / Action | Description |
 |---|---|
@@ -137,7 +137,7 @@ bdh-edit filename.txt
 
 ---
 
-## 🏗️ Engineering Notes
+##  Engineering Notes
 
 Early iterations of `bdh-terminal-engine` experimented with embedded graphical **WebKitGTK** windows. However, GUI loops (`gtk_main_quit`) clashed with the low-level PTY `select()` loop, adding megabytes of bloat and restricting usage strictly to desktop environments.
 
@@ -149,7 +149,7 @@ By refactoring to a **100% Pure Linux CLI Multiplexer & Modal Editor**, the engi
 
 ---
 
-## 🗺️ Roadmap
+##  Roadmap
 
 - [ ] Session persistence / detach-reattach support
 - [ ] Configurable keybindings via `~/.bdhrc`
@@ -158,19 +158,19 @@ By refactoring to a **100% Pure Linux CLI Multiplexer & Modal Editor**, the engi
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions, issues, and feature requests are welcome. Feel free to check the [issues page](https://github.com/BackendDeveloperHub/bdh-terminal-engine/issues) or open a PR against the modular source tree above.
 
 ---
 
-## 📄 License
+## License
 
 Distributed under the **MIT License**. See `LICENSE` for more information.
 
 ---
 
-## 👨‍💻 Author & Workflow
+##  Author & Workflow
 
 **Prabakaran P** — *Backend Developer Hub (BDH Linux)*
 Systems Architecture & Engineering Design · AI-Assisted Low-Level C Implementation · Python / FastAPI
