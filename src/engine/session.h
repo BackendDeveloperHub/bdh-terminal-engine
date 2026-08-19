@@ -8,9 +8,10 @@
 #include "ui/tabs.h"
 #include "ui/statusbar.h"
 #include "engine/parser.h"
-#include "engine/scanner.h"
+// 🔥 FIX: engine/scanner.h நீக்கப்பட்டுவிட்டது!
 #include "engine/clipboard.h"
 #include "engine/screen.h"
+
 #define MAX_SESSIONS 18
 #define NUM_SESSIONS 18
 
@@ -25,6 +26,7 @@ typedef struct {
 
 // Session Management Functions:
 void sessions_init_all(TerminalSession sessions[MAX_SESSIONS], char *shell_argv[], int pty_rows, int pty_cols, int scr_cols, int scr_rows, TabBar *tab_bar, char *tab_names[]);
-void sessions_cleanup_all(TerminalSession sessions[MAX_SESSIONS], TabBar *tab_bar, StatusBar *status_bar, TokenScanner *token_scanner, Clipboard *engine_cb, VirtualScreen *scr);
+// 🔥 FIX: TokenScanner ஆர்கியுமெண்ட் நீக்கப்பட்டுவிட்டது!
+void sessions_cleanup_all(TerminalSession sessions[MAX_SESSIONS], TabBar *tab_bar, StatusBar *status_bar, Clipboard *engine_cb, VirtualScreen *scr);
 
 #endif
