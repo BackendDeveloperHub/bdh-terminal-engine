@@ -109,7 +109,8 @@ install: all
 	@echo "=================================================================="
 	@echo "BDH Engine & IDE installed globally to $(PREFIX)/bin/ !"
 	@echo "Type 'bdh-engine' to launch Multiplexer Engine!"
-	@echo "Type 'bdh-linux-ide' (or related cmds) to launch the IDE tools!"
+	@echo "Type 'bdh-linux-ide'  type to bdh-ide (or related cmds) to launch the IDE tools!"
+    @echo "type 'bdh-tree' to explore system structure"
 	@echo "=================================================================="
 
 # --- Universal System Uninstall Target ---
