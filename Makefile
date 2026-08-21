@@ -69,8 +69,13 @@ ENGINE_SRCS = src/main.c \
               src/engine/renderer.c \
               src/engine/terminal.c
 
+# --- Submodule Initialization ---
+init-submodules:
+	@echo "=> Checking and Updating Git Submodules... 🔄"
+	@git submodule update --init --recursive 2>/dev/null || true
+
 # --- Main Targets ---
-all: check-os bdh-engine build-ide
+all: init-submodules check-os bdh-engine build-ide
 
 # பில்ட் ஆகும்முன் எந்த OS என்று ஸ்க்ரீனில் கெத்தாகக் காட்டும் லாஜிக்
 check-os:
@@ -123,4 +128,4 @@ clean:
 	fi
 	@echo "Cleaned old builds successfully!"
 
-.PHONY: all check-os build-ide clean install uninstall
+.PHONY: all init-submodules check-os build-ide clean install uninstall
