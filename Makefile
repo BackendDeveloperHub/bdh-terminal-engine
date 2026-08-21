@@ -82,7 +82,7 @@ check-os:
 	@echo "================================================="
 	@echo "Auto-Detected OS : $(OS_NAME)"
 	@echo " Selected Compiler: $(CC)"
-	@echo "Install Path     : $(PREFIX)"
+@echo "Install Path     : $(PREFIX)"
 	@echo "================================================="
 
 # 1. Build BDH Multiplexer Engine:
