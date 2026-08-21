@@ -71,7 +71,7 @@ ENGINE_SRCS = src/main.c \
 
 # --- Submodule Initialization ---
 init-submodules:
-	@echo "=> Checking and Updating Git Submodules... 🔄"
+	@echo "=> Checking and Updating Git Submodules... "
 	@git submodule update --init --recursive 2>/dev/null || true
 
 # --- Main Targets ---
@@ -110,7 +110,7 @@ install: all
 	@echo "BDH Engine & IDE installed globally to $(PREFIX)/bin/ !"
 	@echo "Type 'bdh-engine' to launch Multiplexer Engine!"
 	@echo "Type 'bdh-linux-ide'  type to bdh-ide (or related cmds) to launch the IDE tools!"
-    @echo "type 'bdh-tree' to explore system structure"
+    @echo "type 'bdh-tree' to explore system structure!"
 	@echo "=================================================================="
 
 # --- Universal System Uninstall Target ---
