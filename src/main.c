@@ -1,4 +1,4 @@
-// src/main.c - BDH Pure Linux CLI Multiplexer Engine (SSH & Scroll Integrated)
+// src/main.c - BDH Pure Linux CLI Multiplexer Engine (SSH & Scroll Integrated, Zero Warnings)
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -324,13 +324,13 @@ int main(int argc, char *argv[]) {
                         if (t_idx > 0) {
                             char *ssh_argv[] = {"/usr/bin/ssh", ssh_target, NULL};
                             
-                            snprintf(tab_names[free_idx], 32, "%s", ssh_target);
+                            // 🔥 FIX: Truncation Warning Resolved (%.31s)
+                            snprintf(tab_names[free_idx], 32, "%.31s", ssh_target);
                             
                             sessions[free_idx].pid = pty_spawn(ssh_argv, &sessions[free_idx].master_fd, pty_rows, pty_cols);
                             if (sessions[free_idx].pid > 0) {
                                 sessions[free_idx].is_alive = 1;
                                 
-                                // 🔥 விண்டோவை ரீசெட் செய்யும் சரியான லாஜிக்
                                 if (sessions[free_idx].win) {
                                     sessions[free_idx].win->cur_r = 0;
                                     sessions[free_idx].win->cur_c = 0;
@@ -459,7 +459,10 @@ int main(int argc, char *argv[]) {
                 if (r < 1) r = 1;
                 int c1 = (scr_cols - strlen(warn1)) / 2;
                 int c2 = (scr_cols - strlen(warn2)) / 2;
-                if (c1 < 0) c1 = 0; if (c2 < 0) c2 = 0;
+                
+                // 🔥 FIX: Misleading Indentation Warning Resolved
+                if (c1 < 0) c1 = 0; 
+                if (c2 < 0) c2 = 0;
                 
                 for (size_t i = 0; i < strlen(warn1) && c1 + i < (size_t)scr_cols; i++) 
                     screen_put_char_color(scr, r - 1, c1 + i, warn1[i], 1); 
