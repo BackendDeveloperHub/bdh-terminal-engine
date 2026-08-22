@@ -10,9 +10,9 @@ IS_TERMUX := $(shell stat /data/data/com.termux/files/usr >/dev/null 2>&1 && ech
 # உண்மையான லினக்ஸ் OS-ஆ என்று செக் செய்ய
 HAS_OS_RELEASE := $(shell test -f /etc/os-release && echo "yes" || echo "no")
 
-# டீஃபால்ட் செட்டிங்ஸ்
+# டீஃபால்ட் செட்டிங்ஸ் (இங்குதான் -static சேர்க்கப்பட்டுள்ளது)
 CFLAGS = -Iinclude -Isrc -D_GNU_SOURCE -Wall -Wextra
-LDFLAGS = -lutil
+LDFLAGS = -lutil -static
 PREFIX ?= /usr/local
 
 # 1. Termux & PRoot Environments
