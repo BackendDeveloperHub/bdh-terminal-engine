@@ -26,7 +26,7 @@ void sessions_init_all(TerminalSession sessions[MAX_SESSIONS], char *shell_argv[
         sessions[i].pid = pty_spawn(shell_argv, &sessions[i].master_fd, pty_rows, pty_cols);
         
         if (sessions[i].pid < 0 || sessions[i].master_fd < 0) {
-            sessions[i].pid = pty_spawn((char *[]){"/bin/bash", NULL}, &sessions[i].master_fd, pty_rows, pty_cols);
+            sessions[i].pid = pty_spawn((char *[]){"/bin/sh", NULL}, &sessions[i].master_fd, pty_rows, pty_cols);
             if (sessions[i].pid < 0 || sessions[i].master_fd < 0) {
                 continue; 
             }
